@@ -1,0 +1,539 @@
+---
+title: "Combine GTSeek"
+author: "John D. Robinson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+linkcolor: blue
+---
+
+# Combining datasets for recapture analysis: LGC and GTSeek
+Some of the samples with DNA yields too low for capture-seq at Rapid Genomics were sent to GTSeek for genotyping-in-thousands by sequencing (GT-seq) genotyping ([Campbell et al. 2015](https://doi.org/10.1111/1755-0998.12357)) using a panel of markers  developed by Dana Morin at Mississippi State University. We want to combine the two datasets for recapture analyses that follow. To do so, there are several things we need to do here:
+
+1. compile metadata for the samples and add this to our `sampleMetadata` file
+2. extract SNPs targeted by the GT-seq panel for hair samples genotyped by capture-seq
+3. apply some modest locus-level filters (quality, genotype depth) to LGC data
+4. apply some individual-level filters to GTSeek data (based on the individual fuzziness index (IFI) - a measure of potential contamination)
+4. combine the two datasets
+5. record the number of SNPs genotyped for all samples in our `sampleMetadata` file
+6. drop samples that are not sufficiently genotyped prior to recapture analyses
+    + for GTSeek samples, this is handled by filters in step 3 above
+    + for LGC samples, we require that all have genotypes for at least 100 of the SNPs in the dataset
+
+We'll walk through these steps below.  
+
+## Compile metadata
+First, let's load the data and some files with information about the samples (which were submitted to GTSeek in four batches)...  
+```{r loadData}
+gt <- read.csv("../input/UGA_bbh_Prod1_all_Genotypes.csv", header = TRUE)
+gt[1:5,1:8]
+
+#Create a ugaID column with sample identifiers 
+gt$ugaID <- sapply(gt$Sample, FUN=function(x) strsplit(x, split="_")[[1]][6])
+
+#Create an object for metadata
+gt.smd <- data.frame(gtsID = gt$Sample,
+                     ugaID = gt$ugaID,
+                     is.SCR = NA,
+                     is.rep = NA,
+                     week=NA,
+                     year=NA,
+                     snare=NA,
+                     utmSnare=NA,
+                     fqfile=NA,
+                     knownSEX=NA,
+                     sampSOURCE=NA,
+                     region=NA,
+                     nSNPgt=NA)
+#To fill in the utm snares, we'll need the translatable.csv file 
+# this was generated in `1_snareLocations`
+translatable <- read.csv("../sampleinfo/translatable.csv", header = TRUE)
+
+#We also need the source of metadata for these GTSeek samples
+#Read sample metadata into R
+tmp1 <- read.csv("../input/GTSeek_rd1_Metadata.csv", header = TRUE)
+tmp2 <- read.csv("../input/GTSeek_rd2_Metadata.csv", header = TRUE)
+tmp3 <- read.csv("../input/GTSeek_rd3_Metadata.csv", header = TRUE)
+tmp4 <- read.csv("../input/GTSeek_rd4_Metadata.csv", header = TRUE)
+#Some additional metadata for samples that were originally submitted to LGC
+lgcinfo <- read.csv("../input/Finalized Hair Samples w Metadata_Carr.csv", 
+                    header = TRUE)
+
+
+colnames(tmp4)[which(colnames(tmp4) == "Site.ID")] <- "Site.Name"
+tmp4 <- tmp4[,-which(colnames(tmp4) == "RandomID")]
+colnames(tmp4)[which(colnames(tmp4) == "Hair.ID")] <- "RandomID"
+
+keepcols <- c("RandomID","Site.Name","Week","Year")
+sampinfo <- rbind(tmp1[,keepcols], 
+                  tmp2[,keepcols], 
+                  tmp3[,keepcols], 
+                  tmp4[,keepcols])
+
+#Clean the dataset
+#A few samples had incorrect or missing names, or were duplicated unintentionally
+#624-24 was duplicated
+gt <- gt[-which(gt$ugaID == "624-24")[1],] #Drop it from gt
+gt.smd <- gt.smd[-which(gt.smd$ugaID=="624-24")[1],] # from gt.smd
+sampinfo <- sampinfo[-which(sampinfo$RandomID == "624-24")[1],] # and from sampinfo
+
+#A couple of mislabeled samples
+gt.smd$ugaID[which(gt.smd$ugaID == "DC-99427AB")] <- "DC-99427B"
+gt.smd$ugaID[which(gt.smd$ugaID == "DC-99427Sow")] <- "DC-87805Sow"
+
+#A sample with missing name
+gt.smd$ugaID[which(gt.smd$ugaID == "#REF!")] <- "UNK"
+
+#One hair snare without a leading zero in the name
+sampinfo$Site.Name[which(sampinfo$Site.Name == "HS 44")] <- "HS 044"
+
+#Going through the loop to fill in metadata...
+for(i in 1:nrow(gt.smd)) {
+  #gtsID & ugaID are already filled in
+  if(gt.smd$ugaID[i] %in% lgcinfo$RandomID) {
+    is.LGC <- TRUE
+  } else {
+    is.LGC <- FALSE
+  }
+  
+  #Account for NTC samples
+  if(length(grep("NTC",gt.smd$ugaID[i])) == 1) {
+    next
+  }
+  
+  #Fill in is.rep
+  if(length(grep("R$", gt.smd$ugaID[i])) == 1) {
+    gt.smd$is.rep[i] <- ifelse(
+      length(which(gt.smd$ugaID == sub("R$","",gt.smd$ugaID[i]))) == 0,
+      FALSE, TRUE)
+    tmp.ID <- sub("R$","",gt.smd$ugaID[i])
+  } else {
+    gt.smd$is.rep[i] <- ifelse(
+      length(which(gt.smd$ugaID == paste0(gt.smd$ugaID[i],"R"))) == 0, 
+      FALSE, TRUE)
+    tmp.ID <- gt.smd$ugaID[i]
+  }
+  
+  #Account for a few samples that are not in sampinfo
+  if(gt.smd$is.rep[i] == FALSE & 
+     length(which(sampinfo$RandomID == tmp.ID)) == 0) {
+    gt.smd$is.SCR[i] <- FALSE
+    next
+  }
+  
+  gt.smd$week[i] <- sampinfo$Week[sampinfo$RandomID == tmp.ID]
+  gt.smd$year[i] <- sampinfo$Year[sampinfo$RandomID == tmp.ID]
+
+  if(length(grep("HS",sampinfo$Site.Name[sampinfo$RandomID == tmp.ID])) > 0) {
+    gt.smd$snare[i] <- sampinfo$Site.Name[sampinfo$RandomID == tmp.ID] 
+    if(gt.smd$year[i] == 2023) {
+      gt.smd$utmSnare[i] <- translatable$UTMname[which(translatable$name23 == gt.smd$snare[i])]
+    } else if(gt.smd$year[i] == 2024) {
+      gt.smd$utmSnare[i] <- translatable$UTMname[which(translatable$name24 == gt.smd$snare[i])]
+    }
+    gt.smd$region[i] <- "CGA"
+    gt.smd$sampSOURCE[i] <- "Hair Sample"
+    gt.smd$is.SCR[i] <- TRUE
+  } else {
+    gt.smd$snare[i] <- NA
+    gt.smd$utmSnare[i] <- NA
+    gt.smd$is.SCR[i] <- FALSE
+    gt.smd$sampSOURCE[i] <- sampinfo$Site.Name[sampinfo$RandomID == tmp.ID]
+    if(gt.smd$year[i] == 2012) {
+      gt.smd$region[i] <- "CGA-H"
+    } else {
+      gt.smd$region[i] <- "CGA"
+    }
+  }
+
+  #nSNPgt is NA for now...
+  gt.smd$nSNPgt[i] <- NA
+  #Some of the sexes are probably known, but not recorded in our metadata...
+  gt.smd$knownSEX[i] <- NA
+  
+  #If sample was submitted to LGC, pull additional metadata
+  if(is.LGC) {
+    which.row <- which(lgcinfo$Hair.ID == tmp.ID)
+    gt.smd$sampSOURCE[i] <- lgcinfo$What[which.row]
+    gt.smd$knownSEX[i] <- lgcinfo$Sex[which.row]
+    gt.smd$region[i] <- lgcinfo$Region[which.row]
+    rm(which.row)
+  }
+  rm(is.LGC, tmp.ID)
+}
+
+gt.smd[1:10,]
+```
+
+## Extract SNPs
+Now we'll use the column names of the `gt` object to create a list of SNPs to extract from our raw vcf file (from LGC) using the `--positions` argument to `vcftools`. In other words, add the loci genotyped by GTSeek to the set of markers that we're using for individual identification. Note that some of these SNPs will not have a minor allele frequency higher than the filter applied in `3_filterSCR`. We will retain them nonetheless to avoid too much missing data for samples processed via GTSeek.  
+```{r getSNPnames}
+#Column names, avoiding info columns, sexing loci columns, and the ugaID column
+gtsSNPs <- colnames(gt)[-c(1:6,grep("Uam",colnames(gt)),ncol(gt))]
+length(gtsSNPs)
+
+CPOS <- data.frame(CHROM=rep(NA, length(gtsSNPs)), POS=rep(NA, length(gtsSNPs)))
+
+#column names are CHROM_POS - CHROMs are NW_#########.1
+# e.g., NW_025576306.1_4455299
+CPOS$CHROM <- sapply(gtsSNPs, FUN=function(x) 
+  paste(strsplit(x, split="_")[[1]][1:2], collapse="_"))
+CPOS$POS <- sapply(gtsSNPs, FUN=function(x)
+  strsplit(x, split="_")[[1]][3])
+
+head(CPOS)
+
+#Check for loci that are ALREADY in LGC_SCR.vcf
+filtSNPs <- data.frame(CHROM=system("grep -v ^# LGC_SCR.vcf | cut -f 1", intern=TRUE),
+                       POS = system("grep -v ^# LGC_SCR.vcf | cut -f 2", intern=TRUE))
+
+#Avoid including these loci!!
+present <- c()
+for(i in 1:nrow(CPOS)) {
+  tmp.ind <- which(filtSNPs$CHROM == CPOS$CHROM[i] & 
+                     filtSNPs$POS == CPOS$POS[i])
+  if(length(tmp.ind) > 0) {
+    present <- c(present, i)
+  }
+}
+CPOS <- CPOS[-present,]
+length(present)
+write.table(CPOS, file = "GTSeek_SNPs.txt", 
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+Now extract data for these markers using `vcftools`...  
+```{r engine="bash", comment = ""}
+vcftools --vcf UGA_173101_SNPs_Raw.vcf --out GTSeek_SNPs \
+          --positions GTSeek_SNPs.txt --recode
+          
+#How many are in the output?
+grep -v ^# GTSeek_SNPs.recode.vcf | wc -l
+```
+
+## Filter LGC data 
+Now apply some modest filters (quality and genotype depth only) to this small dataset to avoid including bad genotypes or markers...  
+```{r engine="bash", comment = ""}
+#First min quality
+vcftools --vcf GTSeek_SNPs.recode.vcf --out LGC_GTS1 \
+          --minQ 30 --recode
+
+#Then min genotype depth
+vcftools --vcf LGC_GTS1.recode.vcf --out LGC_GTS2 \
+          --minDP 10 --recode
+          
+#Remove any half-calls that are included in this file
+grep ^# LGC_GTS2.recode.vcf > preLGC_GTS.vcf
+grep -v ^# LGC_GTS2.recode.vcf | sed -e 's/\.\/[0,1]/\.\/\./g' | sed -e 's/[0,1]\/\./\.\/\./g' >> preLGC_GTS.vcf
+
+#Then convert to genotype only format with plink2
+plink2 --vcf preLGC_GTS.vcf --out LGC_GTS --recode vcf-4.2 --silent
+
+#Combine these SNPs with those from your previous filtering effort
+# using 'bcftools concat' - need to sort and index the file first
+bcftools sort LGC_SCR.vcf -O b -o LGC_SCR.bcf
+bcftools sort LGC_GTS.vcf -O b -o LGC_GTS.bcf
+bcftools index LGC_SCR.bcf
+bcftools index LGC_GTS.bcf
+bcftools concat -a LGC_SCR.bcf LGC_GTS.bcf -O v -o LGC_allSCRsnps.vcf
+
+#Cleanup
+rm *LGC_GTS* GTSeek_SNPs.recode.vcf
+```
+
+# Filter GTSeek data
+The GTSeek dataset has some samples that are poorly genotyped and some that may be contaminated. With that in mind, we're going to drop some samples before combining them with the rest of the data. Before we get to those filters, let's look at the data a little more closely.  
+
+## GT-seq Performance
+First just the total number of reads per sample in the dataset...  
+```{r GTseqP1}
+#Total Reads
+quantile(gt$Raw.Reads) #There are some outliers
+mean(gt$Raw.Reads)
+hist(gt$Raw.Reads, breaks = 20, 
+     main = "Total Reads", xlab = "Sequencing Reads")
+```
+
+Now the percentage of loci genotyped per sample...  
+```{r GTseqP2}
+#Percent genotyped
+quantile(gt$X.GT)
+mean(gt$X.GT)
+hist(gt$X.GT, breaks = 20,
+     main = "Percent Genotyped", xlab = "Percent")
+
+length(which(gt$X.GT > 90))/nrow(gt) #What proportion are genotyped at >90%
+```
+
+Finally, the *individual fuzziness index* (IFI). This index is described briefly in the header for some of the functions in Nate Campebell's [GTseek_utils](https://github.com/GTseq/GTseek_utils/tree/Main) GitHub repository ([the "GTseq_Genotyper" function](https://github.com/GTseq/GTseek_utils/blob/Main/GTseq_Genotyper_v3.pl), for instance). In the header, IFI is described as:  
+
+"*a measure of DNA cross contamination... calculated using read counts from background signal at homozygous and No-Call loci. Low scores are better than high scores.*"  
+```{r GTseqP3}
+#IFI
+quantile(gt$IFI)
+mean(gt$IFI)
+hist(gt$IFI, breaks = 20,
+     main = "Individual Fuzziness Index", xlab = "IFI")
+```
+
+Does IFI tell us anything about error rates? To assess this, we can look at our technical replicates...  
+```{r GTseqError}
+#Find tech. reps
+repID <- c(gt$ugaID[grep("-23R", gt$ugaID)], 
+           gt$ugaID[grep("-24R", gt$ugaID)])
+ogID <- gsub("R","",repID)
+comp.rep <- data.frame(ogID, repID, 
+                       og.XGT=NA, rep.XGT=NA, 
+                       ogIFI=NA, repIFI=NA,
+                       overlap=NA, mismatch=NA, error=NA)
+for(i in 1:nrow(comp.rep)) {
+  #Check that both samples are present
+  tmp.len <- length(which(gt$ugaID %in% c(repID[i], ogID[i])))
+  if(tmp.len != 2) {
+    stop(paste("Ooops! There are",tmp.len,"samples for",ogID[i]))
+  }
+  comp.rep$og.XGT[i] <- gt$X.GT[gt$ugaID == comp.rep$ogID[i]]
+  comp.rep$rep.XGT[i] <- gt$X.GT[gt$ugaID == comp.rep$repID[i]]
+  comp.rep$ogIFI[i] <- gt$IFI[gt$ugaID == comp.rep$ogID[i]]
+  comp.rep$repIFI[i] <- gt$IFI[gt$ugaID == comp.rep$repID[i]]
+  
+  tmp.gt <- gt[which(gt$ugaID %in% c(comp.rep$ogID[i], 
+                                      comp.rep$repID[i])),
+               -c(1:6,ncol(gt))]
+  #Keep only overlapping calls
+  tmp.gt <- tmp.gt[,which(apply(tmp.gt, 2, 
+                                FUN=function(x)
+                                  sum(x %in% c("0","00")))==0)]
+  comp.rep$overlap[i] <- ncol(tmp.gt)
+  comp.rep$mismatch[i] <- sum(tmp.gt[1,] != tmp.gt[2,])
+  comp.rep$error[i] <- comp.rep$mismatch[i] / comp.rep$overlap[i]
+  rm(tmp.gt, tmp.len)
+}
+
+comp.rep
+
+cor.test(comp.rep$repIFI, comp.rep$ogIFI)
+plot(comp.rep$repIFI ~ comp.rep$ogIFI, 
+     xlab = "IFI - original sample", 
+     ylab = "IFI - replicate",
+     pch = 19)
+
+cor.test(comp.rep$ogIFI, comp.rep$error)
+plot(comp.rep$error ~ comp.rep$ogIFI, 
+     xlab = "IFI - original sample", 
+     ylab = "Error Rate",
+     pch=19)
+```
+
+So the IFI is very similar between the two technical replicates, and it does seem to be predictive of mismatches between the replicates. This should be useful for identifying poorly genotyped samples that should be removed from the dataset.  
+
+## Individual filtering
+It seems reasonable to remove samples for either of two reasons, i) low rate of genotyping or ii) high IFI. In their paper describing GT-seq, [Campbell et al. (2015)](https://doi.org/10.1111/1755-0998.12357) considered samples that were genotyped at less than 50% of SNPs as failed samples. We'll follow their lead below...  
+```{r GTseqFilt}
+#Identify samples that fail either filter
+drop.me <- which(gt$IFI > 2 | gt$X.GT < 0.5)
+length(drop.me)
+
+#Now remove from genotype and metadata
+nrow(gt)
+gt <- gt[-drop.me,]
+nrow(gt)
+```
+
+# Combine LGC and GTSeek data
+Now convert genotypes to VCF format (`0/0`, `0/1`, `1/1`), taking care to assign `REF` alleles to `0` and `ALT` alleles to `1`, to match the conventions in the VCF. Then combine with `LGC_SCR.vcf` and check that `PLINK`, `vcftools`, and `vcfR` all recognize the combined output file as a vcf. If this works, you should be able to calculate the pairwise kinship coefficients in `PLINK2` and perform the clone analysis in `COLONY` to identify recaptures across the combined dataset.  
+
+```{r convertVCF, crop=NULL}
+#First create a file with CHROM, POS, REF, and ALT for all SNPs in LGC_SCR
+# This will be used to convert the CC, CT, TT genotypes to 0/0, 0/1, 1/1
+# with appropriate coding for ref and alt alleles (0 an 1, respectively)
+system("echo 'CHROM\tPOS\tREF\tALT' > scrSNPs.txt")
+system("cat scrSNPs.txt", intern = TRUE)
+#SNP rows of the vcf | CHROM, POS, REF, and ALT columns
+system("grep -v ^# LGC_allSCRsnps.vcf | cut -f 1-2,4-5 >> scrSNPs.txt")
+system("wc -l scrSNPs.txt")
+system("head scrSNPs.txt")
+
+#Read this file with CHROM, POS, REF, and ALT for all SNPs into R
+alleleState <- read.table("scrSNPs.txt", header = TRUE)
+head(alleleState)
+
+#Focus on genotypes at SNPs NOT used for sex determination
+geno <- gt[,-c(1:6,grep("Uam", colnames(gt)),ncol(gt))]
+dim(geno)
+
+#Make an object to fill in with vcf-formatted genotype data
+vcfFormat <- matrix(data = "./.", nrow = nrow(alleleState), ncol = nrow(geno))
+for(a in 1:nrow(vcfFormat)) {
+  #Column names of the GTSeek data file are CHROM_POS
+  tmp.colname <- paste0(alleleState$CHROM[a],"_",alleleState$POS[a])
+  tmp.col <- which(colnames(geno) == tmp.colname)
+  if(length(tmp.col) > 0) { #If this SNP from the LGC_SCR vcf is present in GTSeek data
+    #If REF=C and ALT=T
+    #The cells where the genotype is CC --> 0/0
+    vcfFormat[a,which(geno[,tmp.col] == paste0(alleleState$REF[a],alleleState$REF[a]))] <- "0/0"
+    #Cells where genotype is CT or TC --> 0/1
+    vcfFormat[a,which(geno[,tmp.col] == paste0(alleleState$REF[a],alleleState$ALT[a]) |
+                        geno[,tmp.col] == paste0(alleleState$ALT[a],alleleState$REF[a]))] <- "0/1"
+    #Cells where genotype is TT --> 1/1
+    vcfFormat[a,which(geno[,tmp.col]==paste0(alleleState$ALT[a],alleleState$ALT[a]))] <- "1/1"
+  } 
+}
+dim(vcfFormat)
+
+#There will be lots of missing data here
+vcfFormat[1:20,1:5]
+
+#Do these match?
+test.row <- which(apply(vcfFormat,1,FUN=function(x) length(unique(x))) > 1)[1]
+alleleState[test.row,]
+gt[1:5,paste0(alleleState$CHROM[test.row],"_",alleleState$POS[test.row])]
+vcfFormat[test.row,1:5]
+
+#How many SNPs are in the dataset (i.e., not all ./.)
+sum(apply(vcfFormat, 1, FUN=function(x) length(unique(x))) > 1)
+
+#Now write this to a file...
+colnames(vcfFormat) <- paste0("GTS_",gt.smd$ugaID[-drop.me])
+dim(vcfFormat)
+
+#Then write to a file
+write.table(vcfFormat, sep = "\t", file = "extraCols.vcf", 
+            quote = FALSE, row.names = FALSE, col.names = TRUE)
+```
+
+It seems like this worked. Now we append it to the VCF (`cbind` in R = `paste` in bash) and save the output. Let's try to do this by first condensing the vcf into a simpler format. Note that we're working with a simple VCF output by `PLINK` as it is. The "FORMAT" here is only GT (genotypes only, no depth, quality, allele depth, genotype likelihoods, etc.).  
+```{r engine="bash", comment = ""}
+#Drop all header lines except the column labels
+grep -v ^## LGC_allSCRsnps.vcf > lgc.vcf
+#Paste (cbind) the SNP rows of the LGC_SCR with the extraCols object created above
+paste lgc.vcf extraCols.vcf > out.vcf
+#Now retrieve the header lines
+grep ^## LGC_allSCRsnps.vcf > fullout.vcf
+#And append the combined genotype object to the headers
+cat out.vcf >> fullout.vcf
+```
+
+Check to make sure that all loci have exactly two alleles. Some of the markers from the GTSeek panel have 3!  
+```{r engine="bash", comment = ""}
+vcftools --vcf fullout.vcf --out fullout \
+          --freq
+```
+
+Now read this file into R and identify sites that have exactly two alleles in the dataset...  
+```{r biallelic}
+snpfreq <- read.table("fullout.frq", skip = 1, fill=TRUE)
+colnames(snpfreq)[3] <- "N_ALLELES" 
+biallelic <- snpfreq[which(snpfreq$N_ALLELES == 2),c(1,2)]
+write.table(biallelic, file = "biallelic.txt",
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+Now keep only this list of SNP loci...  
+```{r engine="bash", comment = ""}
+vcftools --vcf fullout.vcf --out prefinal \
+        --positions biallelic.txt \
+        --remove-filtered-all --recode
+```
+
+
+This all worked, so we should be in good shape for downstream analyses with this file!  
+
+## Individual-level filter (missingness)
+Lastly, we want to check to see how many SNPs are genotyped for each individual in the dataset and combine our metadata files into a version with both LGC and GTSeek samples! We also want to remove samples that are genotyped at fewer than 50 (GTSeek) to 100 (LGC) SNPs across the dataset. We are unlikley to be able to confidently identify these samples.  
+```{r metadata_update}
+#Get missing data information for each individual
+system("vcftools --vcf prefinal.recode.vcf --out prefinal --missing-indv")
+
+#Read this file into R
+missSNPs <- read.table("prefinal.imiss", header = TRUE)
+
+#Combine the two metadata files - LGC & GTSeek
+lgc.smd <- read.csv("../sampleinfo/sampleMetadata_nSNPgt.csv", header = TRUE)
+colnames(lgc.smd)[1] <- "extID"
+colnames(gt.smd)[1] <- "extID"
+smd <- rbind(lgc.smd, gt.smd)
+
+smd$vcfID <- c(lgc.smd$extID,
+               paste0("GTS_",gt.smd$ugaID))
+smd$FILT <- NA
+for(i in 1:nrow(smd)) {
+  tmp <- which(missSNPs$INDV == smd$vcfID[i])
+  if(length(tmp) > 0) {
+    smd$nSNPgt[i] <- missSNPs$N_DATA[tmp]-missSNPs$N_MISS[tmp]
+    if(length(grep("GTS_",smd$vcfID[i])) > 0) {
+      if(smd$nSNPgt[i] < 50) {
+        smd$FILT[i] <- TRUE
+      } else {
+        smd$FILT[i] <- FALSE
+      }
+    } else if(length(grep("UGA_",smd$vcfID[i])) > 0) {
+      if(smd$nSNPgt[i] < 100) {
+        smd$FILT[i] <- TRUE
+      } else {
+        smd$FILT[i] <- FALSE
+      }
+    }
+  } else {
+    smd$FILT[i] <- TRUE
+  }
+  rm(tmp)
+}
+
+#Number removed from dataset
+sum(smd$FILT)
+#Number NOT removed
+sum(!smd$FILT)
+#Number of GTSeek samples with 50+ SNPs genotyped
+sum(smd$nSNPgt[grep("GTS_", smd$vcfID)] >= 50, na.rm = TRUE)
+#Number of LGC samples with 100+ SNPs genotyped
+sum(smd$nSNPgt[grep("UGA_", smd$vcfID)] >= 100, na.rm = TRUE)
+
+#These should match
+sum(!smd$FILT) == sum(smd$nSNPgt[grep("GTS_", smd$vcfID)] >= 50, na.rm = TRUE) +
+  sum(smd$nSNPgt[grep("UGA_", smd$vcfID)] >= 100, na.rm = TRUE)
+
+#Number of SNPs genotyped per sample
+smd$nSNPgt[which(smd$FILT == FALSE)]
+
+#Write metadata file
+write.csv(smd, "sampleMetadata_combined.csv", quote = FALSE, row.names=FALSE)
+
+#Keep individuals with mroe than 50 SNPs genotyped...
+keeplist <- smd$vcfID[which(smd$FILT == FALSE)]
+
+#Write keeplist to a text file
+write.table(keeplist, file = "keeperInds.txt", 
+            quote = FALSE, 
+            row.names = FALSE,
+            col.names = FALSE)
+```
+
+Now apply the individual-level filter...  
+```{r engine="bash", comment = ""}
+vcftools --vcf prefinal.recode.vcf --out finalSCR \
+          --keep keeperInds.txt --recode
+```
+
+
+## Test file
+As a quick test, we'll attempt to use this file with `PLINK` and `vcftools`...  
+```{r engine="bash", comment=""}
+#Attempt to calculate pairwise kinship coefficients in plink2
+plink2 --vcf finalSCR.recode.vcf --make-king-table \
+        --out testFinalSCR --allow-extra-chr --silent
+
+#Attempt to use vcftools to make a 012 format file
+vcftools --vcf finalSCR.recode.vcf --012 --out testFinalSCR
+
+#Cleanup
+rm LGC_allSCRsnps.vcf extraCols.vcf lgc.vcf out.vcf
+rm testFinalSCR.log testFinalSCR.kin0
+rm *012*
+```
+
+Proceed to recapture analyses in `PLINK` and `COLONY`!  
+
+---
+

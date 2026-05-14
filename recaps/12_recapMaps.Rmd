@@ -1,0 +1,221 @@
+---
+title: "Mapping Recaptures"
+author: "John D. Robinson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+linkcolor: blue
+---
+
+# Mapping Genotype Recaptures in Central GA
+This markdown will visualize the spatial distribution of bears with *spatial recaptures* from hair samples collected in central Georgia (2023 and 2024). These samples were genotyped via capture-seq (Rapid Genomics) or GT-seq (GTSeek). Capture-seq data were filtered to avoid tightly linked loci (no SNPs within 500kb with $r^2 > 0.8$) and focus on informative markers (MAF > 0.2) and combined with GT-seq data (which have a broader range of MAF), resulting in a total of 1325 SNP loci (see `4_combineGTSeek` for details on combining the data from the two marker panels). Genotypes were subjected to a clone analysis in `COLONY` ([Wang 2016](https://doi.org/10.1111/1755-0998.12452)) and KING kinship coefficients ([Manichaikul et al. 2010](https://doi.org/10.1093/bioinformatics/btq559)) were calculated in [`PLINK2`](https://www.cog-genomics.org/plink/2.0/) ([Chang et al. 2015](https://doi.org/10.1186/s13742-015-0047-8)). Inferences from the two approaches were combined following methods outlined in `10_recapFinal`.  
+
+Here, we'll plot the recaptures for bears as a way to assess a couple of things:
+
+1. Confidence in recapture data - are samples spaced too far apart? Are we confident in the combined inferences from `COLONY` and `PLINK`?
+2. Evidence for moving activity centers - do we have sufficient data to fit a model where activity centers are allowed to move between years? Does this appear to be happening in the dataset?
+
+
+## Load data
+We need to load the recapture objects and the locations of the hair snares to visualize the distribution of recaptures...  
+```{r loadData}
+#Load the sampleMetadata file
+smd <- read.csv("../sampleinfo/sampleMetaData_cloneID.csv", header = TRUE)
+
+#Load capture history objects
+load("../scr/CGA_CH.Rda")
+
+#Load hair snare location data
+load("../sampleinfo/snareLocations.Rda")
+
+#Load the state space
+library(raster)
+S360 <- raster("../input/state-space360.tif")
+
+#Source functions to calculate some basic summary stats
+source("../input/sumstats_4d.R")
+```
+
+## Females
+In the plots that follow, all detections for individuals with spatial recaptures are plotted on the same map. Primary sampling occasions are shown in different colors, while secondary sampling occasions are plotted with different symbols. In cases where the same individual is detected at multiple hair snares *in the same week*, points are connected with a dotted line (colored to indicate the year of the movement). Each plot also gives the total number of detections for a bear, and the number of hair snares $J$, weeks $K$, and years $T$ where the individual was detected.  
+
+First, for females...  
+```{r femaleMaps, fig.height=10, fig.width = 8}
+#Females
+caphist <- Fch$y
+Fclones <- Fch$clone
+
+sumstats_4d(caphist)
+
+nind <- dim(caphist)[1]
+
+yr.col <- c("blue","purple")
+wk.symbol <- 0:6
+
+for(i in 1:nind) {
+  i.ch <- caphist[i,,,]
+  
+  nTraps <- sum(rowSums(i.ch) > 0)
+  if(nTraps > 1) {
+    plot.me <- as.data.frame(which(i.ch == 1, arr.ind = TRUE))
+    plot(S360, legend = FALSE, main = paste("Female",i,"- clone", Fclones[i]))
+    mtext(paste(length(which(smd$finalClone == Fclones[i])), "samples ->",
+                nrow(plot.me), "dets:",
+                nTraps, "J,",
+                length(unique(plot.me$dim2)), "K,",
+                length(unique(plot.me$dim3)), "T"))
+    points(x=locs[plot.me$dim1,1], locs[plot.me$dim1,2],
+           pch = wk.symbol[plot.me$dim2], col = yr.col[plot.me$dim3],
+           cex = 2, lwd = 2)
+    
+    for(r in 2:nrow(plot.me)) {
+      if(plot.me$dim3[r]==plot.me$dim3[r-1] &
+         plot.me$dim2[r]==plot.me$dim2[r-1]) {
+        lines(x=c(locs[plot.me$dim1[r-1],1], locs[plot.me$dim1[r],1]),
+              y=c(locs[plot.me$dim1[r-1],2], locs[plot.me$dim1[r],2]), 
+              lty="dotted", col = yr.col[plot.me$dim3[r]],
+              lwd = 2.5)
+      }
+    }
+    
+    legend("topleft", bty = "n", pch = 0:6, legend = paste("wk",c(1:7)))
+    legend("bottomright", bty = "n", fill = yr.col, legend = c("2023","2024"))
+    
+  }
+}
+```
+
+
+## Males
+Then for males...  
+```{r maleMaps, fig.height=10, fig.width = 8}
+#Males
+caphist <- Mch$y
+Mclones <- Mch$clone
+
+sumstats_4d(caphist)
+
+nind <- dim(caphist)[1]
+
+yr.col <- c("blue","purple")
+wk.symbol <- 0:6
+
+for(i in 1:nind) {
+  i.ch <- caphist[i,,,]
+  
+  nTraps <- sum(rowSums(i.ch) > 0)
+  if(nTraps > 1) {
+    plot.me <- as.data.frame(which(i.ch == 1, arr.ind = TRUE))
+    plot(S360, legend = FALSE, main = paste("Male",i,"- clone", Mclones[i]))
+    mtext(paste(length(which(smd$finalClone == Mclones[i])), "samples ->",
+                nrow(plot.me), "dets:",
+                nTraps, "J,",
+                length(unique(plot.me$dim2)), "K,",
+                length(unique(plot.me$dim3)), "T"))
+    points(x=locs[plot.me$dim1,1], locs[plot.me$dim1,2],
+           pch = wk.symbol[plot.me$dim2], col = yr.col[plot.me$dim3],
+           cex = 2, lwd = 2)
+    
+    for(r in 2:nrow(plot.me)) {
+      if(plot.me$dim3[r]==plot.me$dim3[r-1] &
+         plot.me$dim2[r]==plot.me$dim2[r-1]) {
+        lines(x=c(locs[plot.me$dim1[r-1],1], locs[plot.me$dim1[r],1]),
+              y=c(locs[plot.me$dim1[r-1],2], locs[plot.me$dim1[r],2]), 
+              lty="dotted", col = yr.col[plot.me$dim3[r]],
+              lwd = 2.5)
+      }
+    }
+    
+    legend("topleft", bty = "n", pch = 0:6, legend = paste("wk",c(1:7)))
+    legend("bottomright", bty = "n", fill = yr.col, legend = c("2023","2024"))
+    
+  }
+}
+```
+
+Overall, it seems we have little evidence for movement of activity centers between years. By far, the furthest movements recorded in our capture histories come in a single week!  
+
+---
+
+## Digging in...
+### Female clone 7
+Looking more closely at the first female plotted (clone #7), which had a large within-week movement inferred...  
+```{r checkFem1}
+#Recreating the object that was used to build the female capture history...
+
+#Load sample metadata (smd)
+smd <- read.csv("../sampleinfo/sampleMetaData_cloneID.csv", header = TRUE)
+
+sampsALL <- smd[which(!is.na(smd$finalClone) &
+                        smd$is.SCR == TRUE & 
+                        smd$year %in% c(2023,2024)),]
+
+#Switch name of finalClone column for compatibility with makeCH function
+colnames(sampsALL)[colnames(sampsALL) == "finalClone"] <- "cloneID"
+
+Fsamps <- sampsALL[which(sampsALL$finalSEX == "F"),]
+length(unique(Fsamps$cloneID[!is.na(Fsamps$cloneID)]))
+
+Fsamps[Fsamps$cloneID == 7,]
+table(Fsamps$snare[which(Fsamps$cloneID == 7)])
+
+plot(S360)
+points(locs[rownames(locs) %in% Fsamps$utmSnare[Fsamps$cloneID == 7],])
+points(locs[rownames(locs) %in% Fsamps$utmSnare[which(Fsamps$cloneID == 7 & Fsamps$snare == "HS 066")],], pch = 19)
+
+Fsamps[Fsamps$cloneID == 7 & Fsamps$snare == "HS 066",]
+
+```
+
+So the recapture inference in this case is from `COLONY`, not `PLINK` only, but the sample that is distant from the rest of the set did have fewer SNPs genotyped. Still well enough to make a reliable inference here, especially given the number of samples identified as part of this clone. It seems unlikely that this is a false-positive recapture.  
+
+### Female clone 45
+Clone #45 (the 9th female plotted) also had a large within-week movement (week 4 of 2023)...  
+```{r checkFem9}
+
+#Load sample metadata (smd)
+smd <- read.csv("../sampleinfo/sampleMetaData_cloneID.csv", header = TRUE)
+
+sampsALL <- smd[which(!is.na(smd$finalClone) &
+                        smd$is.SCR == TRUE & 
+                        smd$year %in% c(2023,2024)),]
+
+#Switch name of finalClone column for compatibility with makeCH function
+colnames(sampsALL)[colnames(sampsALL) == "finalClone"] <- "cloneID"
+
+Fsamps <- sampsALL[which(sampsALL$finalSEX == "F"),]
+length(unique(Fsamps$cloneID[!is.na(Fsamps$cloneID)]))
+
+Fsamps[Fsamps$cloneID == 45,]
+table(Fsamps$snare[which(Fsamps$cloneID == 45)])
+
+plot(S360)
+points(locs[rownames(locs) %in% Fsamps$utmSnare[Fsamps$cloneID == 45],])
+points(locs[rownames(locs) %in% 
+              Fsamps$utmSnare[which(Fsamps$cloneID == 45 & 
+                                      Fsamps$snare == "HS 126")],], pch = 19)
+
+Fsamps[Fsamps$cloneID == 45 & Fsamps$snare == "HS 126",]
+#This was a GTSeek sample originally assigned to clone ID 332...
+
+#Look closer at the original COLONY clone
+Fsamps[Fsamps$COLclone == 332,]
+#This includes samples from HS 66, 68, and 126!
+
+#Check kinship of this original COLONY clone
+kingrel <- read.table("recapPLINK.kin0", header = FALSE)
+colnames(kingrel) <- c("id1","id2","nsnp","hehet","ibs0","kinship")
+kingrel$kinship[which(kingrel$id1 %in% Fsamps$vcfID[which(Fsamps$COLclone == 332)] & kingrel$id2 %in% Fsamps$vcfID[which(Fsamps$COLclone == 332)])]
+
+#And kinship of the sample in question to other members of the final clone
+kingrel$kinship[which(kingrel$id1 == "GTS_107-23" & kingrel$id2 %in% Fsamps$vcfID[which(Fsamps$cloneID ==45)])]
+kingrel$kinship[which(kingrel$id1 %in% Fsamps$vcfID[which(Fsamps$cloneID ==45)] & kingrel$id2 == "GTS_107-23")]
+#Kinship is high to all other members of this final clone!
+```
+
+Given the high kinship coefficients with all members of `finalClone` `45` and the presence of GTSeek samples from `HS 066`, `HS 068`, and `HS 126` in `COLONY` clone `332`, this movement also appears to be real!  
+
+---
+
+

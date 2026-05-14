@@ -1,0 +1,153 @@
+---
+title: "Compile Metadata"
+author: "John D. Robinson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+linkcolor: blue
+---
+
+# Compile Metadata for LGC Samples
+We need to build a file of metadata for the sample set. This will be added to as we complete various steps in the analysis - filtering (# of SNPs genotyped), sample sexing (genotype sex, final sex), recapture analysis (clone ID), etc.  
+
+## Input data needed
+We need a couple of pieces of information before we can compile the metadata for the samples.
+
+1. [`Finalized Hair Samples w Metadata_Carr.xlsx`](https://docs.google.com/spreadsheets/d/1aFwuOjzQTl1JsOWbV69sV86DnFRIKxEh/edit?usp=share_link&ouid=108908384617619788254&rtpof=true&sd=true) - contains information on the locations (hair snares), weeks, and years where samples were collected along with sample IDs (both the UGA ID and the original Rapid Genomics ID (plate and well)) - saved as a [`csv file`](https://drive.google.com/file/d/1NqIJ5AKxZHLEQ5cFM1hkVS0t1R6XuhpI/view?usp=share_link).
+2. [`UGA_173101_Summary_Sheet.csv`](https://drive.google.com/file/d/1rlxvTYN_IfvMxDyttRM-cp46UNn7B416/view?usp=share_link) - includes information on the final Rapid Genomics ID (plate and well when sequenced), the name of the corresponding fastq file, and the original customer code (UGA ID above). Use this to match `rgID` to `ugaID`.
+
+## Overview of metadata file
+The file we build will have the following columns...
+
+1. `rgID` - the RapidGenomics ID from data delivery summary sheet
+2. `ugaID` - Random UGA ID (a.k.a. Customer_Code from data delivery summary sheet)
+3. `is.SCR` - is this sample a sample to be used in SCR?
+4. `is.rep` - is this sample replicated?
+5. `week` - Week (occasion) of sampling (for SCR samples)
+6. `year` - Year of sampling (for SCR and non-SCR samples)
+7. `snare` - snare ID (for SCR samples) from name23 or name24
+8. `utmSnare` - UTM id - unique for all locations
+9. `fqfile` - The fastq file for this sample
+10. `knownSEX` - known sex, where available
+11. `sampSOURCE` - source of the sample (hair snare, etc.)
+12. `region` - region (population)
+
+
+## Compile Metadata
+```{r matchSnares}
+smsht <- read.csv("../input/UGA_173101_Summary_Sheet.csv", header = TRUE)
+sampinfo <- read.csv("../input/Finalized Hair Samples w Metadata_Carr.csv", header = TRUE)
+translatable <- read.csv("translatable.csv", header = TRUE)
+head(translatable)
+
+#Weird samples... 
+smsht$Customer_Code[!smsht$Customer_Code %in% sampinfo$Hair.ID]
+#There are 3 samples where Customer_Code doesn't match 
+# hairIDs from the Finalized Hair Samples file
+#    rows 17, 51, and 452 (M21.1, M22.6, 1183-B.13)
+# What are these samples???
+#  After checking the intermediate files...
+# 1183-B.13 is 91.B.13
+# M21.1 and M22.6 are from a plate 14 (WA02), which we don't have??
+#What are these 2 samples??
+smsht$Customer_Code[smsht$Customer_Code == "1183-B.13"] <- "91.B.13"
+smsht[!smsht$Customer_Code %in% sampinfo$Hair.ID,]
+
+nsamp <- nrow(smsht)
+sampleMetaData <- data.frame(
+  rgID = rep(NA, nsamp), #the RapidGenomics ID from data delivery summary sheet
+  ugaID = rep(NA, nsamp), #Random UGA ID
+  is.SCR = rep(NA, nsamp), #is this sample a sample to be used in SCR?
+  is.rep = rep(NA, nsamp), #is this sample replicated?
+  week = rep(NA, nsamp), #Week (occasion) of sampling (for SCR samples)
+  year = rep(NA, nsamp), #Year of sampling (for SCR and non-SCR samples)
+  snare = rep(NA, nsamp), #snare ID (for SCR samples) from name23 or name24
+  utmSnare = rep(NA, nsamp), #UTM id - unique for all locations
+  fqfile = rep(NA, nsamp), #The fastq file for this sample
+  knownSEX = rep(NA, nsamp), #known sex, where available
+  sampSOURCE = rep(NA, nsamp), #source of the sample (hair snare, etc.)
+  region = rep(NA, nsamp)) #region (population)
+
+for(i in 1:nsamp) {
+  sampleMetaData$rgID[i] <- smsht$RG_Sample_Code[i]
+  sampleMetaData$ugaID[i] <- smsht$Customer_Code[i]
+  sampleMetaData$is.SCR[i] <- strsplit(smsht$Customer_Code[i], 
+                                       split="-")[[1]][2] %in% c("23","24")
+  sampleMetaData$is.rep[i] <- smsht$Customer_Code[i] %in% smsht$Customer_Code[-i]
+  
+  #Follicles and rgID are not unique
+  tmp <- unique(sampinfo[sampinfo$Hair.ID == sampleMetaData$ugaID[i],-c(4,21)]) 
+  if(nrow(tmp) > 0) {
+    sampleMetaData$year[i] <- tmp$Year
+    sampleMetaData$knownSEX[i] <- tmp$Sex
+    sampleMetaData$sampSOURCE[i] <- tmp$What
+    sampleMetaData$region[i] <- tmp$Region
+  }
+  
+  if(sampleMetaData$is.SCR[i]) {
+    sampleMetaData$week[i] <- tmp$Week
+    sampleMetaData$snare[i] <- tmp$Site.ID
+    if(sampleMetaData$year[i] == 2023) {
+      sampleMetaData$utmSnare[i] <- 
+        translatable$UTMname[which(translatable$name23==tmp$Site.ID)]
+    } else if(sampleMetaData$year[i] == 2024) {
+      sampleMetaData$utmSnare[i] <- 
+        translatable$UTMname[which(translatable$name24==tmp$Site.ID)]
+    }
+  } else {
+    sampleMetaData$week[i] <- NA
+    sampleMetaData$snare[i] <- NA
+    sampleMetaData$utmSnare[i] <- NA
+  }
+  rm(tmp)
+  sampleMetaData$fqfile[i] <- smsht$Sequence_Name[i]
+}
+
+head(sampleMetaData[!is.na(sampleMetaData$utmSnare),])
+```
+
+We should be able to use that file to fill in the capture history by matching dimnames of `y.all[i,j,k,t]` to the recaptured individual, `utmSnare`, week, and year (respectively).  
+
+## Check the sample numbers processed to date
+Some summaries of number of samples by region, year, week, snare, etc...  
+```{r summarize}
+smd <- sampleMetaData
+
+#Representation by year
+table(smd$year)
+#Representation of SCR samples by year
+table(smd$year[which(smd$is.SCR==TRUE)])
+
+#Number of replicated samples
+sum(smd$is.rep)
+#Number of SCR samples
+sum(smd$is.SCR)
+
+#Samples by week in 2023 and 2024
+table(smd$week[which(smd$year == 2023 & smd$is.SCR == TRUE)])
+table(smd$week[which(smd$year == 2024 & smd$is.SCR == TRUE)])
+
+#Sampling across regions
+table(smd$region)
+
+#Historic samples
+sampleMetaData[which(smd$region == "CGA-H"),]
+
+#Representation of snares in the two years
+table(smd$utmSnare[which(smd$year == 2023)])
+table(smd$utmSnare[which(smd$year == 2024)])
+
+#How many samples do we have from the same snare in a given week
+table(paste0(smd$utmSnare[which(smd$year==2023 & smd$is.SCR == TRUE)],".",
+             smd$week[which(smd$year==2023 & smd$is.SCR == TRUE)]))
+table(paste0(smd$utmSnare[which(smd$year==2024 & smd$is.SCR == TRUE)],".",
+             smd$week[which(smd$year==2024 & smd$is.SCR == TRUE)]))
+```
+
+## Write output
+Now save the metadata to a `.csv` file.  
+```{r writeOut}
+write.csv(smd, file = "sampleMetadata_basic.csv", 
+          quote = FALSE, row.names = FALSE)
+```

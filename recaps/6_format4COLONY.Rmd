@@ -1,0 +1,97 @@
+---
+title: "Format Data for COLONY"
+author: "John D. Robinson"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+linkcolor: blue
+---
+
+# Format SNP Data for `COLONY`
+The `COLONY` run will not be done as part of a markdown (see `runCOLONY.sh`). Here, we'll build the input data file for the `COLONY` analysis, using functions modified sligthly from those associated with Ellie Weise's sea lamprey project (see Ellie's GitHub repo [Nbdlamprey2](https://github.com/weiseell/NbdLamprey2/tree/master)).  
+
+## Output dataset in `012` format
+We start by generating a file in `012` format, where each genotype in the dataset is coded as a 0, 1, or 2 (based on the number of alternate allele copies present).  This can be useful for calculating various measures of diversity and will serve as the basis for our conversion to the format for `COLONY` below.  
+
+*n.b.*, in this format, -1 indicates a missing genotype for an individual at that locus.  
+
+```{r engine="bash", comment = ""}
+vcftools --vcf ../snpfiltering/finalSCR.recode.vcf --out finalSCR --012
+```
+
+Now read the data into R...  
+```{r 012format}
+geno <- read.table("finalSCR.012", header = FALSE, row.names=1)
+dim(geno) #rows are individuals, columns are loci
+geno[1:5,1:5]
+```
+
+## Create `COLONY` input file
+The `COLONY` input file can be built in a text editor, but it requires quite a bit of information.  It may be best to start from a template.  Here, we'll build one using a modified function from a former student, Ellie Weise.  You can find the `colonydat_create.R` script on Ellie's GitHub repo [NbdLamprey2](https://github.com/weiseell/NbdLamprey2/tree/master).  
+
+First, we need to get the data in a format that `COLONY` will recognize. Keep in mind that the `COLONY` input file expects individuals in rows and loci in columns, while our VCF file has the opposite (individuals are in columns).  However, the 012 output from `VCFtools` transposes the dataset.  Our file has `r nrow(geno)` rows and `r ncol(geno)` columns, so it's in the correct orientation for `COLONY` already.  
+
+`COLONY` expects alleles to be coded as integers starting with 1.  Missing data are coded as 0.  The genotypes are expected in two-column format.  I'm sure there's a faster way to do this than a big loop over individuals and loci, but since we only need to do it once, speed isn't a huge concern.  
+```{r colonydat_create}
+#Working with the geno object read in above
+nind <- dim(geno)[1] #individuals
+nloc <- dim(geno)[2] #loci
+#Reading in the individual IDs as well
+indv012 <- read.table("finalSCR.012.indv", header = FALSE)
+
+#Expanding to two-column format
+a1col <- seq(1,nloc*2,by=2)
+a2col <- seq(2,nloc*2,by=2)
+outmat <- matrix(data = NA, nrow = nind, ncol=2*nloc)
+T1 <- Sys.time()
+for(i in 1:nind) {
+  for(l in 1:nloc) {
+    if(geno[i,l] == -1) {
+      outmat[i,a1col[l]] <- 0
+      outmat[i,a2col[l]] <- 0
+    } else if(geno[i,l] == 0) {
+      outmat[i,a1col[l]] <- 1
+      outmat[i,a2col[l]] <- 1
+    } else if(geno[i,l] == 1) {
+      outmat[i,a1col[l]] <- 1
+      outmat[i,a2col[l]] <- 2
+    } else if(geno[i,l] == 2) {
+      outmat[i,a1col[l]] <- 2
+      outmat[i,a2col[l]] <- 2
+    }
+  }
+}
+Sys.time()-T1 #Slow, but not prohibitively
+outmat <- cbind(indv012$V1, outmat)
+outmat[1:5,1:11] #First 5 individuals, first 5 loci
+dim(outmat)
+```
+
+Now source in the `colonydat_create2()` function and use it to create the input file for `COLONY`.  
+```{r make_input}
+source("../input/colonydat_create2.R")
+colonydat_create2
+
+#Note that Wang recommends monogamy model for the clone anlaysis 
+# Recaptures would be full sibs, not half-sibs
+colonydat_create2(proj.name = "CGA",
+                  out.name = "CGA",
+                  kids=outmat,
+                  fem.gamy=1, mal.gamy=1, 
+                  output_file="CGA_COLONY.dat")
+```
+
+
+Now this can be analyzed in `COLONY` by calling one of the colony executables and pointing it at this input file.  Something like:  
+`mpirun -np 8 ./colony2p.ifort.impi2018.out IFN: CGA_COLONY.dat` 
+
+Here's the `.sh` file we'll use to run the `COLONY` job on the cluster:  
+```{r}
+writeLines(readLines("7_runCOLONY.sh"))
+```
+
+We'll run that separately (so there is no markdown created for the `COLONY` run).  
+
+---
+

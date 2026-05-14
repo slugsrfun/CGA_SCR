@@ -1,0 +1,198 @@
+model {
+
+	## Priors
+	# for sex-specific parameters
+	for(sx in 1:2) {
+		behave[sx] ~ dbeta(1,1) #behavioral effect of capture
+		phi[sx] ~ dbeta(1,1) #survival
+		sigma[sx] ~ dgamma(0.01, 0.01) #decay of det. prob. with dist.
+		
+		
+		#year- and sex-specific parameters
+		for(t in 1:nYears) {
+			#baseline det. prob.
+			p0st[sx,t,2] ~ dbeta(1,1) #previously captured individuals
+			p0st[sx,t,1] <- p0st[sx,t,2]*behave[sx] #naive individuals
+		}
+		psi[sx,1] ~ dbeta(1,1) #data augmentation - year 1
+	}
+
+	# for shared parameters
+	gamma ~ dexp(1/0.5) #per-capita recruitment (for each sex, not combined)
+
+	#Recruitment model and expected abundances
+	ENf[1] <- Mf*psi[1,1]
+	ENm[1] <- Mm*psi[2,1]
+	EN[1] <- ENf[1]+ENm[1]
+	for(t in 2:nYears) {
+		#expected male and female recruits
+		ERf[t] <- Nf[t-1]*gamma 
+		ERm[t] <- Nf[t-1]*gamma 
+		ER[t] <- ERf[t]+ERm[t]
+
+		#data augmentation for future years
+		#females
+		psi[1,t] <- ERf[t]/sum(aF[,t-1])
+		psi[2,t] <- ERm[t]/sum(aM[,t-1])
+
+		#expected abundances
+		ENf[t] <- Nf[t-1]*phi[1] + ERf[t]
+		ENm[t] <- Nm[t-1]*phi[2] + ERm[t]
+		EN[t] <- ENf[t]+ENm[t]
+	}
+
+	## State process
+	# activity center & alive / dead / available for FEMALES
+	for(i in 1:Mf) {
+		#Activity center (no movement)
+		sF[i,1] ~ dunif(xlim[1], xlim[2])
+		sF[i,2] ~ dunif(ylim[1], ylim[2])
+		#ones trick for females
+		onesF[i] ~ dbern(S[round((ylim[2]-sF[i,2])/delta + 0.5),
+						   round((sF[i,1]-xlim[1])/delta + 0.5)])
+
+		#Initial statuses
+		zF[i,1] ~ dbern(psi[1,1])
+		aF[i,1] <- 1-zF[i,1]
+
+		#Future statuses
+		for(t in 2:nYears) {
+			EzF[i,t] <- zF[i,t-1]*phi[1] + aF[i,t-1]*psi[1,t]
+			zF[i,t] ~ dbern(EzF[i,t])
+			aF[i,t] <- aF[i,t-1]*(1-zF[i,t])
+		}
+		everAliveF[i] <- max(zF[i,])
+	}
+
+	#activity center & alive / dead / available for MALES
+	for(i in 1:Mm) {
+		#Activity center (no movement)
+		sM[i,1] ~ dunif(xlim[1], xlim[2])
+		sM[i,2] ~ dunif(ylim[1], ylim[2])
+		#ones trick for males
+		onesM[i] ~ dbern(S[round((ylim[2]-sM[i,2])/delta + 0.5),
+						   round((sM[i,1]-xlim[1])/delta + 0.5)])
+
+		#Initial statuses
+		zM[i,1] ~ dbern(psi[2,1])
+		aM[i,1] <- 1-zM[i,1]
+
+		#Future statuses
+		for(t in 2:nYears) {
+			EzM[i,t] <- zM[i,t-1]*phi[2] + aM[i,t-1]*psi[2,t]
+			zM[i,t] ~ dbern(EzM[i,t])
+			aM[i,t] <- aM[i,t-1]*(1-zM[i,t])
+		}
+		everAliveM[i] <- max(zM[i,])
+	}
+
+	## Females
+	# Observed data
+	for(i in 1:nFem) {
+		for(t in 1:nYears) {
+			for(j in oper.traps[1:nTrapsYr[t],t]) {
+				dF[i,j,t] <- sqrt((sF[i,1]-x[j,1])^2 +
+									(sF[i,2]-x[j,2])^2)
+				for(k in 1:nWeeks) {
+					#Expected capture
+					EyF[i,j,k,t] <- p0st[1,t,prevcapF[i,j,k,t]]*
+						exp(-dF[i,j,t]^2/(2*sigma[1]^2))*
+						zF[i,t]
+					#Capture 
+					yF[i,j,k,t] ~ dbern(EyF[i,j,k,t])
+				}
+			}
+		}
+	}
+
+	# Augmented data
+	for(i in (nFem+1):Mf) {
+		for(t in 1:nYears) {
+			for(j in oper.traps[1:nTrapsYr[t],t]) {
+				dF[i,j,t] <- sqrt((sF[i,1]-x[j,1])^2 + 
+									(sF[i,2]-x[j,2])^2)
+				for(k in 1:nWeeks) {
+					#Augmented individuals have no previous capture
+					EyF[i,j,k,t] <- p0st[1,t,1]*
+						exp(-dF[i,j,t]^2/(2*sigma[1]^2))*
+						zF[i,t]
+				}
+				#Prob of no captures of i across nWeeks
+				prNoDetWeekF[i,j,t] <- prod(1-EyF[i,j,,t])
+			}
+			#Prob of capturing i at least once in year t
+			prDetF[i,t] <- 1-prod(prNoDetWeekF[i,oper.traps[1:nTrapsYr[t],t],t])
+			yF.zero[i,t] ~ dbern(prDetF[i,t])
+		}
+	}
+
+	## Males
+	# Observed data
+	for(i in 1:nMale) {
+		for(t in 1:nYears) {
+			for(j in oper.traps[1:nTrapsYr[t],t]) {
+				dM[i,j,t] <- sqrt((sM[i,1]-x[j,1])^2 +
+									(sM[i,2]-x[j,2])^2)
+				for(k in 1:nWeeks) {
+					#Expected capture
+					EyM[i,j,k,t] <- p0st[2,t,prevcapM[i,j,k,t]]*
+						exp(-dM[i,j,t]^2/(2*sigma[2]^2))*
+						zM[i,t]
+					#Capture 
+					yM[i,j,k,t] ~ dbern(EyM[i,j,k,t])
+				}
+			}
+		}
+	}
+
+	# Augmented data
+	for(i in (nMale+1):Mm) {
+		for(t in 1:nYears) {
+			for(j in oper.traps[1:nTrapsYr[t],t]) {
+				dM[i,j,t] <- sqrt((sM[i,1]-x[j,1])^2 + 
+									(sM[i,2]-x[j,2])^2)
+				for(k in 1:nWeeks) {
+					#Augmented individuals have no previous capture
+					EyM[i,j,k,t] <- p0st[2,t,1]*
+						exp(-dM[i,j,t]^2/(2*sigma[2]^2))*
+						zM[i,t]
+				}
+				#Prob of no captures of i across nWeeks
+				prNoDetWeekM[i,j,t] <- prod(1-EyM[i,j,,t])
+			}
+			#Prob of capturing i at least once in year t
+			prDetM[i,t] <- 1-prod(prNoDetWeekM[i,oper.traps[1:nTrapsYr[t],t],t])
+			yM.zero[i,t] ~ dbern(prDetM[i,t])
+		}
+	}
+
+	#Derived parameters
+	totF <- sum(everAliveF)
+	totM <- sum(everAliveM)
+	nTotal <- totF+totM
+	for(t in 1:nYears) {
+		#Abundances
+		Nf[t] <- sum(zF[,t])
+		Nm[t] <- sum(zM[,t])
+		N[t] <- Nf[t]+Nm[t]
+		#Densities
+		#expected
+		ED[t] <- EN[t]/poly.area
+		EDf[t] <- ENf[t]/poly.area
+		EDm[t] <- ENm[t]/poly.area
+		#realized
+		RD[t] <- N[t]/poly.area
+		RDf[t] <- Nf[t]/poly.area
+		RDm[t] <- Nm[t]/poly.area
+	}
+
+	for(t in 2:nYears) {
+		survivingF <- zF[,t-1] %*% zF[,t]
+		survivingM <- zM[,t-1] %*% zM[,t]
+		recruitF <- (1-zF[,t-1]) %*% zF[,t]
+		recruitM <- (1-zM[,t-1]) %*% zM[,t]
+		lambdaF <- Nf[t]/max(Nf[t-1], 0.1)
+		lambdaM <- Nm[t]/max(Nm[t-1], 0.1)
+		lambda <- N[t]/max(N[t-1], 0.1)
+	}
+}

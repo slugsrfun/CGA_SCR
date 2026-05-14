@@ -1,0 +1,9 @@
+1                                              			* A number = sum of method(s) to run: LD(=1), Het(=2), Coan(=4), Temporal(=8).
+/scratch/jdrobins/CGA_BlackBears/popgen/		 	* Input Directory
+CGA_GPfile.txt		                              			* Input file name
+2                                                		* 1 = FSTAT format, 2 = GENEPOP format
+/scratch/jdrobins/CGA_BlackBears/popgen/		   	* Output Directory
+CGA_Ne.txt	                            			* Output file name (put asterisk adjacent to the name to append)
+2                                                		* Number of critical values, added 1 if a run by rejecting only singleton alleles is included
+0.05                                        			* Critical values, a special value '1' is for rejecting only singleton alleles
+0                                                		* 0: Random mating, 1: Monogamy (LD method)

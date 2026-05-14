@@ -1,0 +1,172 @@
+---
+title: "Create Capture History Objects"
+author: "John D. Robinson"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+linkcolor: blue
+---
+
+# Building Capture Histories for SCR Analyses
+In this markdown, we'll create capture histories for the SCR analyses that follow. Each object will include i) a `y` array of capture histories (with `dim = c(i, j, k, t)`, individuals, traps, occasions, years), ii) a `pc` array (of similar dimensions) with previous capture information (for models with a local behavioral effect), and iii) a `clone` vector that has identifiers for each individual $i$ (from the `finalClone` column of our `sampleMetadata` file). We want to build several of these objects, given interest in fitting different (open vs. closed) models. 
+
+1. For closed population models - data for two years saved separately (3-d array), separate for the two sexes as well
+    + Females in 2023
+    + Females in 2024
+    + Males in 2023
+    + Males in 2024
+2. For open population models - two years combined (4-d array), but still modeling the sexes separately
+    + Females (2023 and 2024)
+    + Males (2023 and 2024)
+
+## Load data, source function
+Load *i*) the sample metadata with clone ID information and *ii*) the `.Rda` with locations and yearly operational status of hair snares. Source in functions for *i*) building capture history and previous capture objects and *ii*) calculating summaries of capture histories from a 3-d or 4-d `y` array (based on a function from the [`scrbook` R package](https://github.com/jaroyle/scrbook)).  
+```{r loadData}
+#Load sample metadata (smd)
+smd <- read.csv("../sampleinfo/sampleMetaData_cloneID.csv", header = TRUE)
+#Load snare location information
+load("../sampleinfo/snareLocations.Rda")
+ls()
+
+#Source the makeCH function
+source("../input/makeCH.R")
+#Source the sumstats functions (for 3d and 4d arrays)
+source("../input/sumstats_4d.R")
+```
+
+## Closed population models
+Splitting the dataset up by year and sex...  
+```{r makeCHclosed}
+#Start with all hair samples from 2023 and 2024
+sampsALL <- smd[which(!is.na(smd$finalClone) &
+                        smd$is.SCR == TRUE & 
+                        smd$year %in% c(2023,2024) &
+                        smd$FILT == FALSE &
+                        !is.na(smd$finalSEX)),]
+
+#Check the dataset
+nrow(sampsALL)
+table(sampsALL$region)
+table(sampsALL$finalSEX)
+sum(!sampsALL$finalSEX %in% c("M","F"))
+length(unique(sampsALL$finalClone[!is.na(sampsALL$finalClone)]))
+sum(is.na(sampsALL$finalClone))
+
+#Separately for males, females, 2023, and 2024
+snares23 <- locs[oper[,1] == 1,]
+snares24 <- locs[oper[,2] == 1,]
+
+#M23
+Msamps23 <- sampsALL[which(sampsALL$year == 2023 &
+                       sampsALL$finalSEX == "M"),]
+dim(Msamps23)
+table(Msamps23$finalSEX)
+table(Msamps23$year)
+length(unique(Msamps23$finalClone[!is.na(Msamps23$finalClone)]))
+
+M23 <- makeCH(samps=Msamps23,
+              traps=snares23,
+              yrs=2023)
+dim(M23$y)
+dim(M23$pc)
+length(M23$clone)
+
+#M24
+Msamps24 <- sampsALL[which(sampsALL$year == 2024 &
+                       sampsALL$finalSEX == "M"),]
+dim(Msamps24)
+length(unique(Msamps24$cloneID[!is.na(Msamps24$cloneID)]))
+
+M24 <- makeCH(samps=Msamps24,
+              traps=snares24,
+              yrs=2024)
+dim(M24$y)
+dim(M24$pc)
+length(M24$clone)
+
+length(unique(c(M23$clone,M24$clone)))
+
+#F23
+Fsamps23 <- sampsALL[which(sampsALL$year == 2023 &
+                       sampsALL$finalSEX == "F"),]
+dim(Fsamps23)
+length(unique(Fsamps23$finalClone[!is.na(Fsamps23$finalClone)]))
+
+
+F23 <- makeCH(samps=Fsamps23,
+              traps=snares23,
+              yrs=2023)
+dim(F23$y)
+dim(F23$pc)
+length(F23$clone)
+
+#F24
+Fsamps24 <- sampsALL[which(sampsALL$year == 2024 &
+                       sampsALL$finalSEX == "F"),]
+dim(Fsamps24)
+length(unique(Fsamps24$finalClone[!is.na(Fsamps24$finalClone)]))
+
+F24 <- makeCH(samps=Fsamps24,
+              traps=snares24,
+              yrs=2024)
+dim(F24$y)
+dim(F24$pc)
+length(F24$clone)
+
+length(unique(c(F23$clone, F24$clone)))
+
+#And the summary stats
+rowSums(M23$y)
+sumstats_3d(M23$y)
+rowSums(M24$y)
+sumstats_3d(M24$y)
+
+rowSums(F23$y)
+sumstats_3d(F23$y)
+rowSums(F24$y)
+sumstats_3d(F24$y)
+```
+
+## Open population models
+Combining data for years, but sexes are still separate...  
+```{r makeCHopen}
+#Females - both years
+Fsamps <- sampsALL[which(sampsALL$finalSEX == "F"),]
+length(unique(Fsamps$finalClone[!is.na(Fsamps$finalClone)]))
+
+Fch <- makeCH(samps=Fsamps,
+              traps=locs,
+              yrs=c(2023,2024))
+dim(Fch$y)
+dim(Fch$pc)
+length(Fch$clone)
+
+#Males - both years
+Msamps <- sampsALL[which(sampsALL$finalSEX == "M"),]
+length(unique(Msamps$finalClone[!is.na(Msamps$finalClone)]))
+
+Mch <- makeCH(samps=Msamps,
+              traps=locs,
+              yrs=c(2023,2024))
+
+dim(Mch$y)
+dim(Mch$pc)
+length(Mch$clone)
+
+#And the summary stats
+rowSums(Fch$y)
+sumstats_4d(Fch$y)
+
+rowSums(Mch$y)
+sumstats_4d(Mch$y)
+```
+
+## Save the output
+Save all of these objects (`F23`,`F24`,`M23`,`M24`,`Fch`,`Mch`) to a single `.Rda` file...  
+```{r saveOut}
+save(F23, F24, M23, M24, Fch, Mch, file = "CGA_CH.Rda")
+```
+
+---
+

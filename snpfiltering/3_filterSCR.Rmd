@@ -1,0 +1,270 @@
+---
+title: "SNP Filters: Identity Analyses"
+author: "John D. Robinson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+linkcolor: blue
+---
+
+# Filtering the VCF
+The raw VCF file is quite large (over 8Gb). We want to subset this large dataset to a set of markers that will be maximally informative for identity analyses. Note that we will have a separate set of filters applied for population genetic analyses (*i.e.*, genetic diversity, population structure, effective population size).  
+
+The basic steps involved in the filters below include:
+
+0. Cleaning the raw VCF - remove duplicated lines, half-calls, indels
+1. Quality filter at the locus level - drop the SNP locus if quality < 30
+2. Maximum depth filter at the locus level - drop SNP loci if total sequencing depth is > $2\sigma$ above mean total depth
+3. Min depth filter at the genotype level - don't call genotypes with < 10 reads
+4. Polymorphism filter - only retain loci that have exactly two alleles
+5. Minor allele frequency filter - keep sites with MAF > 0.2
+6. Avoiding linkage - prune markers based on LD within 500kb windows ($r^2$ < 0.8)
+
+After all of these filters, the file `LGC_SCR.vcf` will contain SNP genotypes for samples processed by LGC / Rapid Genomics. In the next step, we will combine these with a smaller number of loci genotyped via GT-seq (by GTSeek). We will come back to the raw VCF used here to extract genotypes for loci from the GT-seq panel that did not make it into the `LGC_SCR.vcf`. At the end of each of these two markdowns, we include a short section evaluating the power of the marker set via calculation of the probability of identity - $p_{ID}$ - the chance that two unrelated individuals would share a genotype at all markers in the panel.  
+
+## Step 0: Clean the raw VCF
+First, copy the files and create some summaries of average depth, per-individual missing data, and per-genotype depth.  
+```{r engine="bash", comment=""}
+cd /scratch/jdrobins/CGA_BlackBears/snpfiltering
+
+cp ../../LGC_BlackBears/UGA_173101/Delivery-20250620_merged/VCFs/UGA_173101_SNPs_Raw.vcf ./
+
+#Use bcftools norm to remove duplicate SNPs
+bcftools norm -d snps UGA_173101_SNPs_Raw.vcf -o filt0uniq.vcf
+
+#Use sed to replace the half-calls (./0 and ./1) with missing data (./.)
+grep ^# filt0uniq.vcf > filt0.vcf
+grep -v ^# filt0uniq.vcf | sed -e 's/\.\/[0,1]/\.\/\./g' | sed -e 's/[0,1]\/\./\.\/\./g' >> filt0.vcf
+
+#Use vcftools to remove indels
+vcftools --vcf filt0.vcf --remove-indels --recode --out filt0
+
+#make .idepth, .imiss, and .gdepth (this one is bigger) files for later filters
+vcftools --vcf filt0.recode.vcf --out raw --depth
+vcftools --vcf filt0.recode.vcf --out raw --missing-indv
+vcftools --vcf filt0.recode.vcf --out raw --geno-depth
+
+#How many SNPs do we start with?
+grep -v ^# filt0.recode.vcf | wc -l
+```
+
+Plot some summaries of depth and missingness...  
+```{r plotMissing0}
+depth <- read.table("raw.idepth", header = TRUE)
+miss <- read.table("raw.imiss", header = TRUE)
+
+hist(depth$MEAN_DEPTH, main = "Histogram of Average Sequencing Depth (per locus)", 
+     xlab = "Depth")
+hist(miss$F_MISS, main = "Histogram of Missing Data (per individual)",
+     xlab = "Proportion Missing")
+
+#Quantiles of depth and missingness
+quantile(depth$MEAN_DEPTH)
+quantile(miss$F_MISS)
+```
+
+```{r echo=FALSE}
+snpct <- as.numeric(system("grep -v ^# filt0.recode.vcf | wc -l", intern=TRUE))
+```
+
+## Step 1: Genotype Quality
+The first filter we apply is a genotype quality filter (`--minQ`).  
+
+Prior to these filters, we have `r snpct` loci in the VCF...  
+```{r engine="bash", comment = ""}
+#Filter sites 
+# min site quality of 30
+# create a new VCF
+vcftools --vcf filt0.recode.vcf --out filt1 \
+          --minQ 30 --remove-filtered-all --recode
+```
+
+```{r echo=FALSE}
+snpct <- as.numeric(system("grep -v ^# filt1.recode.vcf | wc -l", intern=TRUE))
+```
+
+## Step 2: Maximum Depth
+Next, we remove sites that are sequenced far more deeply than other markers. These may be loci where paralagous regions of the genome have been combined. We would expect markers in such regions to show elevated diversity and deviate from Hardy-Weinberg equilibrium. There are other ways to remove these (see [McKinney et al. 2017](https://doi.org/10.1111/1755-0998.12613)), but we'll use a simple maximum (total) depth filter.  
+
+Prior to these filters, we have `r snpct` SNPs in the dataset...  
+```{r engine="bash", comment=""}
+#Get summaries of mean depth per site (for max depth filter) 
+vcftools --vcf filt1.recode.vcf --site-depth --out filt1
+```
+
+Now in R, we can use this `filt1.ldepth` file to calculate a mean total depth (summed across individuals)...  
+```{r calcMeanDepth}
+ldep <- read.table("filt1.ldepth", header = TRUE)
+
+mean(ldep$SUM_DEPTH)
+sd(ldep$SUM_DEPTH)
+
+#This will be our threshold... 
+# nothing more than 2 sd above the mean...
+cap <- mean(ldep$SUM_DEPTH) + (2*sd(ldep$SUM_DEPTH))
+cap
+
+keeper.sites <- ldep[which(ldep$SUM_DEPTH <= cap),c(1,2)]
+write.table(keeper.sites, file="keepersites.txt", 
+            quote=FALSE, row.names = FALSE, col.names = FALSE)
+
+```
+
+Now apply this filter...  
+```{r engine="bash", comment=""}
+#Then remove loci based on this threshold...
+vcftools --vcf filt1.recode.vcf --out filt2 \
+          --positions keepersites.txt \
+          --remove-filtered-all --recode
+```
+
+```{r echo=FALSE}
+snpct <- as.numeric(system("grep -v ^# filt2.recode.vcf | wc -l", intern=TRUE))
+```
+
+## Step 3: Genotype Depth
+In the next filter, we remove genotype calls that are based on fewer than 10 reads. We set this threshold to maximize our confidence in individual calls. This is very important for identity analyses where missed calls lead to mismatches and may inflate the number of unique individuals detected in our project. We also remove loci that are missing data for more than 90% of samples.  
+
+Prior to these filters, we have `r snpct` loci in the VCF...  
+```{r engine="bash", comment=""}
+#Min depth for genotype calls is 10 reads
+# Max missing is 90% of SNPs
+vcftools --vcf filt2.recode.vcf --out filt3 \
+          --minDP 10 --max-missing 0.1 --remove-filtered-all --recode
+```
+
+```{r echo=FALSE}
+snpct <- as.numeric(system("grep -v ^# filt3.recode.vcf | wc -l", intern=TRUE))
+```
+
+## Step 4: Polymorphism filter
+Now we want to apply a filter to remove sites that have more or less than 2 alleles. The built in `--min-alleles` and `--max-alleles` arguments in `vcftools` do not work the way we would want them to. They ignore variation present in the VCF at that stage, and instead base the number of alleles at a marker on the original calls (*i.e.*, the number of alleles implied by the `REF` and `ALT` columns of the file). This unnecessarily removes "multiallelic" sites that become biallelic after depth filters, which amounted to several thousand SNP loci in our dataset. Instead, we'll use the `--positions` argument to specify a keeper list of SNP loci where there are two alleles.  
+
+First, generate an allele frequency summary for the vcf using `vcftools`...  
+```{r engine="bash", comment = ""}
+vcftools --vcf filt3.recode.vcf --out filt3 \
+          --freq
+```
+
+Now read this file into R and identify sites that have exactly two alleles in the dataset...  
+```{r biallelic}
+snpfreq <- read.table("filt3.frq", skip = 1, fill=TRUE)
+colnames(snpfreq) <- c("CHROM","POS","N_ALLELES","N_CHR", "A1","A2","A3")
+biallelic <- snpfreq[which(snpfreq$N_ALLELES == 2),c(1,2)]
+write.table(biallelic, file = "biallelic.txt",
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+Now retain only SNP loci in this list ...  
+```{r engine="bash", comment = ""}
+vcftools --vcf filt3.recode.vcf --out filt4 \
+        --positions biallelic.txt \
+        --remove-filtered-all --recode
+```
+
+
+```{r echo=FALSE}
+snpct <- as.numeric(system("grep -v ^# filt4.recode.vcf | wc -l", intern=TRUE))
+```
+
+## Step 5: Minor Allele Frequency (MAF) 
+SNP loci that have high minor allele frequencies will be the most useful for individual identification (and relationship inferences), so we focus our analysis on markers with high minor allele frequency. Note that the GT-seq panel that we're using has some low frequency SNPs included. In subsequent steps (*i.e.*, `4_combineGTSeek`), we'll come back to the raw VCF and extract genotypes for markers that are excluded here to retain SNPs that were genotyped via GT-seq. However, the bulk of our dataset will have high minor allele frequency to maximize our power for individual identification. Below, we remove sites with MAF < 0.2.  
+
+Prior to these filters, we have `r snpct` loci in the VCF...  
+```{r engine="bash", comment=""}
+#MAF filter - remove SNPs with minor allele frequency < 0.01
+vcftools --vcf filt4.recode.vcf --out filt5 \
+          --maf 0.2 --remove-filtered-all --recode
+```
+
+```{r echo=FALSE}
+snpct <- as.numeric(system("grep -v ^# filt5.recode.vcf | wc -l", intern=TRUE))
+```
+
+## Step 6: Pruning based on Linkage Disequilibrium (LD)
+Finally, tightly linked loci do not provide independent information on individual identity, as they are inherited together. Thus, we need to subsample the SNP loci to avoid markers that are tightly linked. Below, we use `PLINK2` to  prune markers that exhibit high LD within 500 kb windows ($r^2 < 0.8$).  
+
+Prior to these filters, we have `r snpct` loci in the VCF...  
+```{r engine="bash", comment=""}
+#Create pruning files (LDprune prefix) with sets of markers 
+# to remove (prune.out suffix) and keep (prune.in suffix)
+plink2 --vcf filt5.recode.vcf --allow-extra-chr \
+        --indep-pairwise 500 kb 1 0.8 \
+        --set-all-var-ids @:# --out LDprune --silent
+        
+#Apply the prune.in file to keep only loci that pass the LD filter
+plink2 --vcf filt5.recode.vcf --set-all-var-ids @:# \
+        --allow-extra-chr --extract LDprune.prune.in \
+        --recode vcf-4.2 --out LGC_SCR --silent
+
+#Extract allele frequencies for these SNPs to calculate p_{ID}
+plink2 --vcf LGC_SCR.vcf --allow-extra-chr --freq --out LGC_SCR --silent
+
+#How many loci?
+grep -v ^# LGC_SCR.vcf | wc -l
+```
+
+```{r echo=FALSE}
+snpct <- as.numeric(system("grep -v ^# LGC_SCR.vcf | wc -l", intern=TRUE))
+```
+
+After all filters are applied, we have `r snpct` loci in the VCF. These will be combined with SNPs genotyped via GT-seq to form the dataset we use for the recapture analyses.   
+
+---
+
+# Summarize Dataset
+Now we'll summarize i) the extent of missing data in our filtered VCF and ii) the power of the SNP set for individual identification (by calculating $p_{ID}$). We'll also record the number of genotyped markers for each sample in our metadata file.  
+
+## Missingness
+We will eventually need to impose a filter based on missing data. We will delay doing that until we've included the loci genotyped via GT-seq. But let's take a look now at the level of missing data in the SNP set from LGC...  
+```{r missSNPs}
+thresh <- snpct - 50 # we want at least 50 SNPs genotyped
+
+system("vcftools --vcf LGC_SCR.vcf --out LGC_SCR --missing-indv")
+missSNPs <- read.table("LGC_SCR.imiss", header=TRUE)
+range(missSNPs$N_MISS)
+hist(missSNPs$N_MISS, main="Histogram of the # of missing SNPs",
+     xlab = "Number of SNPs", ylab = "Individuals", breaks=50)
+sum(missSNPs$N_MISS > thresh)
+```
+
+From our total sample set, `r sum(missSNPs$N_MISS > thresh)` individuals are genotyped at fewer than `r snpct - thresh` of the `r missSNPs$N_DATA[1]` loci in the filtered dataset.  
+
+
+## Evaluate Power of the Set
+We can use the allele frequencies above to calculate $p_{ID}$ for the marker set (and for random subsets of the SNP data to give us an idea of how many markers we need to successfully genotype to keep an individual in the dataset).  
+
+Here we're using the simple equation from [Waits et al. (2001)](https://doi.org/10.1046/j.1365-294X.2001.01185.x).  
+For one locus with two alleles:  
+$$p_{ID}=\sum(p_i^4)+(2p_ip_j)^2$$
+
+Then the power of the combined marker set is the product of $p_{ID}$ across all SNP loci, as markers are assumed to provide independent information on identity.  
+```{r filt5apID}
+freqs <- read.table("LGC_SCR.afreq", header = FALSE)
+colnames(freqs) <- c("CHROM", "CPOS", "REF", "ALT", "FRQ", "NCHR")
+freqs$pID <- rep(NA, nrow(freqs))
+for(l in 1:nrow(freqs)) {
+  freqs$pID[l] <- (freqs$FRQ[l]^4+(1-freqs$FRQ[l])^4) + 
+                    (2*freqs$FRQ[l]*(1-freqs$FRQ[l]))^2
+}
+sum(log10(freqs$pID))
+```
+
+Finally, add information on the number of SNPs genotyped in each sample to our sample metadata file.  
+```{r metadata}
+smd <- read.csv("../sampleinfo/sampleMetadata_basic.csv", header = TRUE)
+
+#Add the number of genotyped SNPs in the filtered VCF to sampleMetaData
+smd$nSNPgt <- rep(NA, nrow(smd))
+for(i in 1:nrow(smd)) {
+  tmp <- which(missSNPs$INDV == smd$rgID[i])
+  smd$nSNPgt[i] <- missSNPs$N_DATA[tmp]-missSNPs$N_MISS[tmp]
+  rm(tmp)
+}
+write.csv(smd, "sampleMetadata_nSNPgt.csv", quote = FALSE, row.names=FALSE)
+```
+
+---
+
+

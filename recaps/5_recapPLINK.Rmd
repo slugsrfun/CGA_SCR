@@ -1,0 +1,59 @@
+---
+title: "Recapture Analsyis: PLINK2"
+author: "John D. Robinson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+linkcolor: blue
+---
+
+# Recapture Analysis in `PLINK2`
+The identification of individuals in a large multi-locus dataset like the one we're working with in this project is not a trivial task. Many studies adopt threshold-based approaches that consider the number of mismatching genotype calls across a set of markers. However, the threshold number of differences, below which two samples are assumed to be from the same individual, is at least somewhat arbitrary. Notably, that threshold should be influenced by the number of markers genotyped in the two samples, as the probability of a mismatch induced by an erroneous genotype call increases with the total number of loci. A better approach is to use estimates of kinship, which are less sensitive to the number of shared loci between a pair of samples. However, there are still downsides. Specifically, *all* pairwise approaches suffer from "self-inconsistent inferences" (see [Wang 2016](https://doi.org/10.1111/1755-0998.12452)). In other words, we may end up with three samples (A, B, and C) that have pairwise relationships that are not possible (A$=$B and B$=$C, but A$\ne$C). The likelihood clustering analysis in `COLONY` (*i.e.*, the "clone" analysis; [Wang 2016](https://doi.org/10.1111/1755-0998.12452)) avoids this issue, but it will almost certaintly crop up in any pairwise approach, including the pairwise kinship coefficient estimates from `PLINK2` generated here.  
+
+## Estimating Pairwise Kinship in PLINK2
+[This page](https://www.cog-genomics.org/plink/2.0/distance#make_rel) from the `PLINK2` manual contains some information on calculating relatedness among samples.  [Srivastha et al. (2021)](https://doi.org/10.1016/j.biocon.2021.109028) used `PLINK` estimates of relatedness to identify recaptures of individual dholes (*Cuon alpinus*), with a threshold relatedness of 0.8. This threshold was based on relatedness estimates for duplicately processed samples, which averaged 0.98 and ranged from 0.86 to 1.  
+
+In tests with a preliminary dataset, the KING relatedness estimator is output in a format that's more conducive for our recapture analyses. We still need to define a threshold above which we will infer that two samples are from the same individual. Quoting from the `PLINK2` manual (emphasis mine)...  
+
+"Note that KING kinship coefficients are scaled such that duplicate samples have kinship 0.5, not 1. First-degree relations (parent-child, full siblings) correspond to ~0.25, second-degree relations correspond to ~0.125, etc. *It is conventional to use a cutoff of ~0.354 (the geometric mean of 0.5 and 0.25) to screen for monozygotic twins and duplicate samples*, ~0.177 to add first-degree relations, etc."  
+
+The kinship estimator implemented in `PLINK2` is described in [Manichaikul et al. (2010)](https://doi.org/10.1093/bioinformatics/btq559).  
+```{r plink2}
+#KING relatedness - max of 0.5 for duplicate samples, FS and PO are 0.25
+system(paste("plink2",
+             "--vcf ../snpfiltering/finalSCR.recode.vcf",
+             "--make-king-table",
+             "--out recapPLINK",
+             "--allow-extra-chr", sep=" "))
+kingrel <- read.table("recapPLINK.kin0", header = FALSE)
+colnames(kingrel) <- c("id1","id2","nsnp","hehet","ibs0","kinship")
+
+
+
+#Double check that all pairs of samples are represented in the output
+#Number of unique IDs should match...
+length(unique(c(kingrel$id1,kingrel$id2)))
+# the number of data columns in VCF
+system("grep ^#CHROM ../snpfiltering/finalSCR.recode.vcf | tr '\t' '\n' | grep _ | wc -l")
+
+#The number of rows of the relatedness output should match...
+nrow(kingrel)
+# the output of n choose 2 where n = the number of individuals above
+choose(length(unique(c(kingrel$id1,kingrel$id2))), 2)
+
+#Plot the distribution of pairwise relatedness estimates
+hist(kingrel$kinship, breaks = 50)
+#Zoom in on values > 0
+hist(kingrel$kinship[kingrel$kinship > 0], breaks=50, 
+     main = "Distribution of pairwise KING kinship estimates", 
+     xlab = "KING Kinship", ylab = "")
+abline(v = 0.354, lty = "dashed", col = "red", lwd = 2)
+text(x = 0.345, y = 1000, col="red", adj=c(1,0.5),
+     label = "recommended cutoff = 0.354")
+```
+
+See the `10_recapFinal` markdown for further anlaysis of these data, and the combination of results from `COLONY` and `PLINK2`...  
+
+---
+

@@ -1,0 +1,53 @@
+---
+title: "Recapture Analsyis: COLONY"
+author: "John D. Robinson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+linkcolor: blue
+---
+
+# Recapture Analysis in `COLONY`
+The `COLONY` job ran successfully in ~10 hours (using the parallel `COLONY` executable with 8 cores). Note that this analysis is faster when using the monogamous mating model, which [Wang (2016)](https://doi.org/10.1111/1755-0998.12452) recommends. This way, only full-sib groups are identified at first. It is unlikely that pairs of samples identified as half-sibs would actually be recaptures. While this is fine for the clone analysis in `COLONY`, it would not be appropriate for an analysis intended to reconstruct the pedigree of the sample or estimate $N_b$ using the sibship method implemented in `COLONY`. Those analyses would require the polygamous mating model.  
+
+In this markdown, we read in the outputs from `COLONY` and calculate a few basic summaries...  
+```{r readCOLout}
+col.out <- read.table("/home/jdrobins/CGA_BlackBears/recaps/CGA.BestClone", 
+                      header = TRUE)
+
+col.list <- vector("list", nrow(col.out))
+for(i in 1:nrow(col.out)) {
+  col.list[[i]] <- strsplit(col.out[i,3], split=",")[[1]]
+}
+
+col.list[[1]]
+col.list[[2]]
+col.list[[3]]
+```
+
+## Summarize output
+Some quick summaries of the clusters identified by `COLONY`...  
+```{r summCOLONY}
+#Total number of unique genotypes
+length(col.list)
+
+#Histogram of cluster probabilities
+hist(col.out$Prob, xlab = "Cluster Probability")
+
+#Sizes of clusters
+nsamps <- sapply(col.list, FUN=length)
+hist(nsamps, xlab = "Number of Samples per Cluster", breaks = 20)
+
+#Relationship between cluster size and probability?
+plot(x = nsamps, y=col.out$Prob, 
+     xlab = "Cluster size", ylab = "Cluster probability",
+     pch = 19, cex = 0.5)
+cor.test(nsamps, col.out$Prob)
+```
+
+Further analysis, including assignment of cloneIDs and comparisons of outputs from `COLONY` and `PLINK2` are in `10_recapFinal`.  
+
+---
+
+

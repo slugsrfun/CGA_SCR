@@ -1,0 +1,432 @@
+---
+title: "Sex Identification"
+author: "John D. Robinson"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+linkcolor: blue
+---
+
+# Identifying the Sex of Samples
+This markdown assigns sex for all samples based on genotypes at markers on the bear Y-chromosome. It also compares inferred sex from genotypic data to known sex, where available, to test the performance of the assignment strategy. The scheme for sex identification is different for the two datasets we have in this project.  
+
+## Sex identification for Rapid Genomics samples
+For the capture-seq data from Rapid Genomics, we use data from three Y-chromosome regions to assign sex of indiviudals. The basic scheme is as follows:
+
+1. Use data from all 3 Y-specific regions (*SMCY*, *NCY*, *AMELY*).
+2. Call individuals male if at least two of these have at least one SNP with sequencing depth of 5 or greater.
+    + If the sample has only one region with a SNP with this sequencing depth, leave sex undetermined.
+3. Call individuals female if none of the scaffolds have a SNP with sequencing depth of 5 or greater, while the scaffold associated with *ZFX* does have at least one SNP with this sequencing depth (*i.e.*, use this scaffold as an internal positive control).
+    + If depth of sequencing on the *ZFX* scaffold does not meet the threshold, leave sex undetermined.
+  
+
+### Finding the Relevant Scaffolds
+There are several loci targeted by the capture-seq probe panel that should be useful for identifying the sex of individuals. These are all listed in the `FASTA_coverage` tab of [LGC_UGA_173101_BlackBearProbePanel.xlsx](https://docs.google.com/spreadsheets/d/18WTYfzYPhyIZcIf4AcKTfc8shdbIAJua/edit?usp=sharing&ouid=108908384617619788254&rtpof=true&sd=true) and in [Black Bear primer design.xlsx](https://docs.google.com/spreadsheets/d/10tIu7FyFX5RChB88E4G4GSgiBU7_5Ciymitw1_f5u60/edit?usp=sharing) (from Dr. Helen Bothwell). In particular, there are 7 markers listed there. We can match the accession numbers listed for these individuals to the `Probes` tab of the `BlackBearProbePanel` file above to identify the scaffolds associated with each marker. Here's some info about the loci:
+
+1. AB261815 - *Ursus arctos* X-specific ZFX gene ([Bidon et al. 2013](https://doi.org/10.1111/1755-0998.12072)) - NW_025576616.1
+2. HF547901 - *U. arctos* Y-specific non-coding ([Bidon et al. 2013](https://doi.org/10.1111/1755-0998.12072)) - NW_025577084.1 
+3. AB261823 - *U. arctos* Y-specific SMCY gene ([Bidon et al. 2013](https://doi.org/10.1111/1755-0998.12072)) - NW_025577082.1
+4. EF635972 - *Ailuropoda melanoleuca* amelogenin (AMELX) gene ([Xu et al. 2008](https://doi.org/10.1007/s10592-007-9376-1)) - NW_025577869.1
+5. EF635973 - *A. melanoleuca* amelongenin (AMELY) ([Xu et al. 2008](https://doi.org/10.1007/s10592-007-9376-1)) - NW_025577869.1 & NW_025578353.1
+6. X14440 - *H. sapiens* X-chr amelogenin ([Yamamoto et al. 2002](https://doi.org/10.1292/jvms.64.505)) - NW_025577869.1 & NW_025578353.1
+7. M63499-M63500 - Bovine amelogenein mRNA ([Yamamoto et al. 2002](https://doi.org/10.1292/jvms.64.505)) - NW_025577869.1 & NW_025578353.1
+
+
+These 7 markers ultimately fall onto 5 scaffolds of the *U. americanus* reference genome ([gsc_jax_bbear_1.0](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_020975775.1/)):
+
+1. `NW_025576616.1` (X-specific, *ZFX*)
+2. `NW_025577084.1` (Y-specific, non-coding)
+3. `NW_025577082.1` (Y-specific, *SMCY*)
+4. `NW_025577869.1` (X-specific: 29.2k-33.4k)
+5. `NW_025578353.1` (Y-specific: 267k-271k)
+
+Note that the [Yamamoto et al. (2002)](https://doi.org/10.1292/jvms.64.505) reference mentions that the amelogenin gene is found on both the X and Y chromosome in Japanese black bears. The Y-specific allele has a 54bp deletion, so it ends up being shorter in length than the X-specific allele. 
+
+Looking at the [NCBI Genome Data Viewer](https://www.ncbi.nlm.nih.gov/gdv/browser/genome/?id=GCF_020975775.1), we can distinguish the AMELX and AMELY genes. Specifically, searching for AMELY returns a hit to `NW_025578353.1` `267K-271K`. Searching for AMELX returns a hit to this region and `NW_025577869.1` `29.2K-33.4K`. We could also narrow the *ZFX* gene down to `390k-445k`, but we would lose a good number of markers by doing this. In the interest of preserving markers on the `NW_025576616.1` scaffold to serve as an internal positive control in the sex identification analysis, we'll use the entire scaffold below.  
+
+### Extract Sexing Markers
+First, let's pull all five scaffolds out of the raw VCF. Generally, the plan will be to sex individuals based on the presence / absence of data at scaffolds on the Y chromosome, given levels of missing data at the scaffold where *ZFX* (from the X chromosome) is found, in other words, our internal positive control. This is very similar to the approach from Bidon et al. (2013). More specifically, if we detect *at least two of the three* Y-specific regions, then the individual is a male. If we fail to detect any of the Y-specific regions, and the sample produces adequate data from the *ZFX* scaffold, then the individual is a female. If we detect only 1 Y-specific region, or we detect 0 Y-specific regions but the sample does not produce adequate data from the *ZFX* scaffold, we leave the individual's sex as undetermined.  
+
+First extract the scaffolds we're interested in...  
+```{bash extractScaffs}
+grep ^# ../snpfiltering/UGA_173101_SNPs_Raw.vcf > sexingloci.vcf
+grep NW_025576616.1 ../snpfiltering/UGA_173101_SNPs_Raw.vcf | uniq >> sexingloci.vcf
+grep NW_025577084.1 ../snpfiltering/UGA_173101_SNPs_Raw.vcf | uniq >> sexingloci.vcf  
+grep NW_025577082.1 ../snpfiltering/UGA_173101_SNPs_Raw.vcf | uniq >> sexingloci.vcf  
+grep NW_025577869.1 ../snpfiltering/UGA_173101_SNPs_Raw.vcf | uniq >> sexingloci.vcf  
+grep NW_025578353.1 ../snpfiltering/UGA_173101_SNPs_Raw.vcf | uniq >> sexingloci.vcf  
+
+grep -v ^# sexingloci.vcf | wc -l #How many SNPs on these scaffolds
+
+#Apply a quality filter to these markers
+vcftools --vcf sexingloci.vcf --minQ 30 --out sexinglociQ30 --recode
+```
+
+```{bash VCFtools1, results='hide'}
+#Get mean depth per individual across all SNPs
+vcftools --vcf ../snpfiltering/UGA_173101_SNPs_Raw.vcf --out allSNP --depth
+#Get missing data per individual across all SNPs
+vcftools --vcf ../snpfiltering/UGA_173101_SNPs_Raw.vcf --out allSNP --missing-indv
+
+#Get depth per individual at each sexing locus
+vcftools --vcf sexinglociQ30.recode.vcf --out sexing --geno-depth
+```
+
+### Load depth and genotype objects
+This portion of the analysis will add a column to the `sampleMetaData` object with information on the sex of each sample (`sex`). We need to load the depth and genotype files that we created above...  
+```{r loadMetaData}
+sampleMetadata <- read.csv("sampleMetadata_combined.csv", 
+                           header = TRUE)
+head(sampleMetadata)
+
+# Read in the objects created above...
+alldp <- read.table("allSNP.idepth", header = TRUE)
+allmiss <- read.table("allSNP.imiss", header = TRUE)
+sexdp <- read.table("sexing.gdepth", header = TRUE)
+```
+
+### Samples with excessive missing data
+Some individuals are poorly sequenced (see outliers in the plot above). We will remove samples from the dataset for SCR analyses if they are not genotyped for at least 50-100 of the SNPs used for that purpose (50 SNPs for GTSeek samples, 100 SNPs for LGC samples). Those samples will also be removed from consideration for the population genetics analyses, as we can not verify that they constitute distinct individuals. Below is the full range of missing data and the distribution for samples that are filtered...  
+```{r dropInds}
+#Plot of levels of missing data across all loci...
+hist(allmiss$F_MISS, main = "Proportion of missing data", 
+     xlab = "Missing Data", ylab = "Individuals")
+abline(v = 0.9, lwd = 2, col = "red")
+abline(v = 0.75, lwd = 2, col = "blue")
+legend("top", text.col=c("blue", "red"),
+       legend=c(paste("n =", sum(allmiss$F_MISS > 0.75), "with >75% missing"),
+                paste("n =", sum(allmiss$F_MISS > 0.90), "with >90% missing")))
+
+#Boxplot of missing data for all samples, retained samples, and filtered samples
+boxplot(
+  allmiss$F_MISS,
+  allmiss$F_MISS[which(allmiss$INDV %in% 
+                         sampleMetadata$vcfID[which(sampleMetadata$FILT == FALSE)])],
+  allmiss$F_MISS[which(allmiss$INDV %in% 
+                         sampleMetadata$vcfID[which(sampleMetadata$FILT == TRUE)])],
+  names = c("ALL","KEPT","CUT"), ylab = "Proportion of loci missing")
+```
+Filtering samples that were genotyped at fewer than 50 (GTSeek) or 100 (LGC) SNPs from the set used for recapture analyses resulted in `r sum(sampleMetadata$FILT)` samples being removed from the dataset.  
+
+### Subset to regions of interest
+We'll retain the full scaffold for *ZFX*, but for *AMELY* (the variant of amelogenin found on the Y-chromosome), we'll still restrict our sex identification analysis to the specific window on scaffold `NW_025578353`.    
+```{r subsetRegions}
+#Subset to regions of specific interest
+range(sexdp$POS[sexdp$CHROM == "NW_025577869.1"])
+range(sexdp$POS[sexdp$CHROM == "NW_025578353.1"])
+
+drop.me <- rep(0, nrow(sexdp))
+for(l in 1:length(drop.me)) {
+  if(sexdp$CHROM[l] == "NW_025577869.1") {
+    #Subset to AMELX region of NW_025577869.1
+    if(sexdp$POS[l] > 33400) {
+      drop.me[l] <- 2
+    } else if(sexdp$POS[l] < 29200) {
+      drop.me[l] <- 2
+    }
+  } else if(sexdp$CHROM[l] == "NW_025578353.1") {
+    #Subset to AMELY region of NW_025578353.1
+    if(sexdp$POS[l] < 267000) {
+      drop.me[l] <- 2
+    } else if(sexdp$POS[l] > 271000) {
+      drop.me[l] <- 2
+    }
+  } 
+}
+
+sexdp <- sexdp[drop.me < 2,]
+table(sexdp$CHROM) #How many SNPs are left in each of these regions...
+```
+
+### Check for Y-specific SNPs
+Now to start looking at patterns of missing data and sequencing depth across the markers. First, let's plot levels of missing data per scaffold.  
+```{r boxPlotMissing}
+# First look at the distribution of missingness
+#Missing data on a scaffold-by-scaffold basis
+#Remember that NW_025577082, NW_025577084, and NW_025578353 are Y-linked
+boxplot(colSums(sexdp[sexdp$CHROM=="NW_025576616.1",] == -1) 
+        /nrow(sexdp[sexdp$CHROM=="NW_025576616.1",]),
+        colSums(sexdp[sexdp$CHROM=="NW_025577084.1",] == -1)
+        /nrow(sexdp[sexdp$CHROM=="NW_025577084.1",]),
+        colSums(sexdp[sexdp$CHROM=="NW_025577082.1",] == -1)
+        /nrow(sexdp[sexdp$CHROM=="NW_025577082.1",]),
+        colSums(sexdp[sexdp$CHROM=="NW_025577869.1",] == -1)
+        /nrow(sexdp[sexdp$CHROM=="NW_025577869.1",]),
+        colSums(sexdp[sexdp$CHROM=="NW_025578353.1",] == -1)
+        /nrow(sexdp[sexdp$CHROM=="NW_025578353.1",]),
+        names = c("ZFX", "nc Y", "SMCY", "AMELX", "AMELY"), 
+        ylab = "Proportion missing data", 
+        xlab = "Scaffolds")
+```
+
+The plot shows the distribution of proportions of *samples* missing data at SNPs on each of the scaffolds. As expected, more samples are missing data for SNPs on scaffolds associated with the Y-chromosome that for SNPs that are NOT on the Y. It appears that roughly half of the samples are missing 100% of SNPs for *ncY* and *SMCY*, as we might expect with roughly equal numbers of male and female samples in the dataset.  
+
+### Count Votes
+Focusing on the Y-specific regions, we give each of the three scaffolds a vote for male or female. We also impose a minimum depth threshold (across the region) that needs to be met to "detect" the Y chromosome in a sample. We set this threshold to $\ge 5$ sequence reads for least one SNP on the segment. So at least one SNP on each Y-chromosome scaffold needs to be genotyped at this depth to provide a "male" vote. Two male votes are required to assign sex as male.   
+```{r countYs}
+#Now look at the 3 Y-specific scaffolds, each gets a vote for M (1) / F (0)
+SMCYdp <- NCYdp <- AMELYdp <- rep(NA, nrow(alldp)) 
+
+#Scaffolds
+#SMCY - NW_025577082 (Bidon et al.)
+#non-coding Y (NCY) - NW_025577084 (Bidon et al.)
+#AMELY - NW_025578353 (Yamamoto et al. & Wu et al.)
+#ZFX - NW_025576616.1 (Bidon et al.)
+
+#Reducing the threshold should allow us to identify sex for more individuals!
+DPthresh <- 5
+
+for(i in 1:nrow(alldp)) {
+  #Depth - full scaffold
+  # if >= 5 reads, male, if < 5 and ZFX scaffold >=5, female
+  if(max(sexdp[sexdp$CHROM == "NW_025577082.1",(i+2)]) >= DPthresh) {
+    SMCYdp[i] <- 1
+  } else if(max(sexdp[sexdp$CHROM=="NW_025576616.1",(i+2)]) >= DPthresh) {
+    SMCYdp[i] <- 0
+  }
+  if(max(sexdp[sexdp$CHROM == "NW_025577084.1",(i+2)]) >= DPthresh) {
+    NCYdp[i] <- 1
+  } else if(max(sexdp[sexdp$CHROM=="NW_025576616.1",(i+2)]) >= DPthresh) {
+    NCYdp[i] <- 0
+  }
+  if(max(sexdp[sexdp$CHROM == "NW_025578353.1",(i+2)]) >= DPthresh) {
+    AMELYdp[i] <- 1
+  } else if(max(sexdp[sexdp$CHROM=="NW_025576616.1",(i+2)]) >= DPthresh) {
+    AMELYdp[i] <- 0
+  }
+}
+
+nrow(alldp) #Total number of samples
+#Depth
+table(SMCYdp) #male (1) and female (0) counts
+table(NCYdp)
+table(AMELYdp)
+```
+
+Now we need to combine the results from the 3 Y markers.  
+```{r allCombo}
+is.male <- allcombined <- c()
+for(i in 1:length(SMCYdp)) {
+  allcombined[i] <- paste0(SMCYdp[i],".",NCYdp[i],".",AMELYdp[i])
+  is.male[i] <- sum(SMCYdp[i],NCYdp[i],AMELYdp[i], na.rm = TRUE)
+
+  #Don't call female if unable to...
+  if(allcombined[i] == "NA.NA.NA") {
+    is.male[i] <- NA #Don't call individuals with 3 NA's female!!
+  }
+}
+
+table(allcombined) 
+table(is.male)
+sum(is.na(is.male))
+```
+
+Now create a vector of individual sexes...  
+```{r sexvec}
+#Create a vector that applies the scheme
+SXout <- rep(NA, length(is.male))
+SXout[is.na(is.male)] <- NA #Not assigned
+SXout[is.male == 1] <- NA #Not assigned
+SXout[is.male > 1] <- "M" #Male requires at least 2 votes!
+SXout[is.male == 0] <- "F" #Female
+table(SXout)
+sum(is.na(SXout))
+
+```
+
+---
+
+## Sex identification for GTSeek samples
+The GT-seq panel used to genotype our samples includes six sexing markers. The genotype data for these markers are recorded as inferred sexes (*i.e.*, `XX` or `XY`). We'll take a majority rule approach here too. The scheme for sex identification in GTSeek samples is as follows:
+
+1. Check genotypes at all sex identification markers. If more than 2 of the 6 markers are missing data, leave sex undetermined.
+2. If at least 4 markers are in agreement on the sex of the individual, regardless of the total number genotyped, call sex
+    + If 4 SNPs genotyped and all 4 agree, assign sex
+    + If 4 SNPs genotyped, 3 M $\to$ `M`
+    + If 5 SNPs genotyped, 4 F and 1 M $\to$ `F`
+    + If 5 SNPs genotyped, 3 F and 2 M $\to$ `undet`
+
+
+### Load the data
+First read the load from GTSeek and subsample to the columns associated with sex identification markers...  
+```{r loadGTSeek}
+gt <- read.csv("../input/UGA_bbh_Prod1_all_Genotypes.csv", header = TRUE)
+gt[1:5,1:9]
+colnames(gt)
+
+#Create a ugaID field in this object...
+gt$ugaID <- sapply(gt$Sample, FUN=function(x) strsplit(x, split="_")[[1]][6])
+#remove duplicated sample 624-24 (see combineGTSeek for more info)
+gt <- gt[-which(gt$ugaID== "624-24")[1],] 
+#Rename a few samples
+gt$ugaID[which(gt$ugaID== "DC-99427AB")] <- "DC-99427B"
+gt$ugaID[which(gt$ugaID== "DC-99427Sow")] <- "DC-87805Sow"
+gt$ugaID[which(gt$ugaID== "#REF!")] <- "UNK"
+
+
+sexSNPs <- gt[,c(which(colnames(gt) == "ugaID"),
+                 grep("Uam",colnames(gt)))]
+dim(sexSNPs)
+head(sexSNPs)
+```
+
+As a first check, let's see what the distribution of counts for `XX` and `XY` are across samples in the dataset. Do these 6 loci always agree in the inferred sex? It would be pretty surprising if they did!  
+```{r FMratio}
+FMratio <- apply(sexSNPs[,-1], 1, 
+                 FUN = function(x)paste0(sum(x== "XX"),":",sum(x== "XY")))
+table(FMratio)
+```
+
+### Assign sexes
+Clearly, ther eare many cases where not all 6 loci agree on an individual's sex. However, the vast majority of samples appear to show a good deal of agreement among markers. With this in mind, we set a threshold of 4 votes one way or the other. A sample needs to have at least four votes for male or female. If it does, we have a majority and we will assign that sex to the sample. If there are fewer than 4 loci genotyped, or fewer than 4 loci agree on the sex one way or the other, we leave sex undetermined.  
+```{r assignSex_GTSeek}
+#Loop through the list and assign sexes
+GTS_SXout <- c()
+
+for(i in 1:nrow(sexSNPs)) {
+  if(sum(sexSNPs[i,]== "XX") >= 4) {
+    GTS_SXout[i] <- "F"
+  } else if(sum(sexSNPs[i,]== "XY") >= 4) {
+    GTS_SXout[i] <- "M"
+  } else {
+    GTS_SXout[i] <- "undet"
+  }
+}
+
+length(GTS_SXout) #Should be 998 calls here
+table(GTS_SXout)
+```
+
+### Add to metadata
+Now we loop through the `sampleMetadata` object and fill in sexes into a new column: `sexGT`. First, check to make sure you have the sample IDs (`extID` or `ugaID`) correct for all samples.  
+```{r add2smd}
+#For the LGC data...
+length(SXout)
+length(grep("UGA",sampleMetadata$extID))
+#For the GTSeek data...
+length(GTS_SXout)
+length(grep("GTseek",sampleMetadata$extID))
+
+#Loop through sampleMetadata and fill in genotype-inferred sexes
+sampleMetadata$sexGT <- sampleMetadata$GTservice <- c()
+for(i in 1:nrow(sampleMetadata)) {
+  if(sampleMetadata$extID[i] %in% alldp$INDV) {
+    sampleMetadata$GTservice[i] <- "LGC"
+    which.row <- which(alldp$INDV == sampleMetadata$extID[i])
+  } else if(sampleMetadata$extID[i] %in% gt$Sample) {
+    sampleMetadata$GTservice[i] <- "GTSeek"
+    which.row <- which(gt$Sample == sampleMetadata$extID[i])
+  }
+  
+  #Skip the NTCs
+  if(length(grep("NTCp", sampleMetadata$ugaID[i])) > 0) {
+    next
+  }
+  
+  if(sampleMetadata$GTservice[i] == "LGC") {
+    if(is.na(SXout[which.row])) {
+      sampleMetadata$sexGT[i] <- "undet"
+    } else {
+      sampleMetadata$sexGT[i] <- SXout[which.row]
+    }
+  } else if(sampleMetadata$GTservice[i] == "GTSeek") {
+    if(is.na(GTS_SXout[which.row])) {
+      sampleMetadata$sexGT[i] <- "undet"
+    } else {
+      sampleMetadata$sexGT[i] <- GTS_SXout[which.row]
+    }
+  }
+  
+  rm(which.row)
+}
+
+#Combined for all samples...
+table(sampleMetadata$sexGT)
+sum(is.na(sampleMetadata$sexGT))
+
+#How many unassigned sexes from the two services?
+sum(sampleMetadata$sexGT[which(sampleMetadata$GTservice == "LGC")] == "undet")
+sum(sampleMetadata$sexGT[which(sampleMetadata$GTservice == "GTSeek")] == "undet")
+```
+
+---
+
+## Check for obvious errors
+There are two easy checks for errors in these assignments. First, we have some samples with known sexes in the dataset. How well are we able to recover known sex? Second, we have some technical replicates included in both datasets. Are there any cases of disagreements between sexes within replicate pairs?  
+
+### Known sex samples
+Quick summary of known sexes - note that these are primarily from the Rapid Genomics sample set.  
+```{r knownSEX}
+table(sampleMetadata$sexGT[which(sampleMetadata$knownSEX == "M")])
+table(sampleMetadata$sexGT[which(sampleMetadata$knownSEX == "F")])
+```
+
+This looks very good. But it is somewhat concerning that we call a known M a F with both our analyses. Let's take a closer look at that individual.  
+```{r weirdM}
+sampleMetadata[which(sampleMetadata$knownSEX == "M" & 
+                       sampleMetadata$sexGT == "F"),]
+
+#Load the full metadata .csv 
+fullMeta <- read.csv("../input/Finalized Hair Samples w Metadata_Carr.csv", header = TRUE)
+weirdID <- sampleMetadata$ugaID[which(sampleMetadata$knownSEX=="M" & 
+                                        sampleMetadata$sexGT=="F")]
+fullMeta[fullMeta$Hair.ID == weirdID,c("Hair.ID",
+                                       "Sex",
+                                       "Date",
+                                       "County",
+                                       "What",
+                                       "Comments",
+                                       "Address")]
+
+```
+
+The incorrectly sexed sample appears to be a cub. Let's check the data for that individual a little more closely. Below we show the read depths for the three Y-chromosome scaffolds used to sex individuals and the *ZFX*-associated scaffold used as an internal positive control. Keep in mind that `vcftools` codes missing data as -1 in the `--geno-depth` output.  
+```{r cubDepth}
+cub63DC <- sampleMetadata$extID[sampleMetadata$ugaID == weirdID]
+sexdp[sexdp$CHROM=="NW_025577082.1",cub63DC]
+sexdp[sexdp$CHROM=="NW_025577084.1",cub63DC]
+sexdp[sexdp$CHROM=="NW_025578353.1",cub63DC]
+
+#And the positive control...
+sexdp[sexdp$CHROM=="NW_025576616.1",cub63DC]
+```
+
+The individual appears to be missing data at almost all SNPs on these three chromosomes, while it has an average depth of `r round(mean(sexdp[sexdp$CHROM=="NW_025576616.1",cub63DC][sexdp[sexdp$CHROM=="NW_025576616.1",cub63DC] > -1]),1)` across the `r length(sexdp[sexdp$CHROM=="NW_025576616.1",cub63DC][sexdp[sexdp$CHROM=="NW_025576616.1",cub63DC] > -1])` successfully genotyped SNPs on the internal positive control scaffold (NW_025576616.1). If our threshold for depth was lower (*i.e.*, 2 reads), it would have returned a 1 for `NW_025577082`. This would've led to an undetermined sex assignment, as we require agreement on male status for at least 2 of the 3 Y-linked regions. Changing this threshold would likely lead us to misclassify some females as males.  
+
+### Technical replicates
+Now let's look at the replicated samples. Do the sex assignments for replicate samples ever disagree?  
+```{r checkDups}
+dup.ID.list <- unique(
+  sub("R$","",sampleMetadata$ugaID[which(sampleMetadata$is.rep == TRUE)]))
+
+check.reps <- data.frame(ugaID = dup.ID.list,
+                         nsamp = NA,
+                         nSexes = NA,
+                         sexGT = NA)
+
+for(i in 1:nrow(check.reps)) {
+  tmp <- sampleMetadata[which(sampleMetadata$ugaID %in% c(check.reps$ugaID[i],
+                                                          paste0(check.reps$ugaID[i],"R"))),]
+  check.reps$nsamp[i] <- nrow(tmp)
+  check.reps$nSexes[i] <- length(unique(tmp$sexGT))
+  check.reps$sexGT[i] <- paste(tmp$sexGT, collapse = ".")
+  rm(tmp)
+}
+nrow(check.reps)
+table(check.reps$nSexes)
+check.reps[which(check.reps$nSexes > 1),]
+```
+
+The replicated sample with different inferred sexes (`227-23`) is one that we'll come back to later (in `10_recapFinal`).  
+
+---
+
+## Save `sampleMetadata`
+Finally, write the genotype-assigned sex to a new version of the sampleMetaData file...  
+```{r writeOut}
+write.csv(sampleMetadata, "sampleMetadata_sexGT.csv", quote=FALSE, row.names=FALSE)
+```
+
+---
+
