@@ -6,7 +6,7 @@ model {
 		behave[sx] ~ dbeta(1,1) #behavioral effect of capture
 		phi[sx] ~ dbeta(1,1) #survival
 		sigma[sx] ~ dgamma(0.01, 0.01) #decay of det. prob. with dist.
-		
+		gamma[sx] ~ dexp(1/0.5) #per-capita recruitment (for each sex, not combined)
 		
 		#year- and sex-specific parameters
 		for(t in 1:nYears) {
@@ -17,17 +17,14 @@ model {
 		psi[sx,1] ~ dbeta(1,1) #data augmentation - year 1
 	}
 
-	# for shared parameters
-	gamma ~ dexp(1/0.5) #per-capita recruitment (for each sex, not combined)
-
 	#Recruitment model and expected abundances
 	ENf[1] <- Mf*psi[1,1]
 	ENm[1] <- Mm*psi[2,1]
 	EN[1] <- ENf[1]+ENm[1]
 	for(t in 2:nYears) {
 		#expected male and female recruits
-		ERf[t] <- Nf[t-1]*gamma 
-		ERm[t] <- Nf[t-1]*gamma 
+		ERf[t] <- Nf[t-1]*gamma[1] 
+		ERm[t] <- Nf[t-1]*gamma[2] 
 		ER[t] <- ERf[t]+ERm[t]
 
 		#data augmentation for future years

@@ -18,7 +18,7 @@ Rscript render_assessPVA.R
 
 conda deactivate
 
-cp 24_assessPVA.pdf /home/jdrobins/CGA_BlackBears/PDFs/
+cp 14_assessPVA.pdf /home/jdrobins/CGA_BlackBears/PDFs/
 cp jc4.gzip /home/jdrobins/CGA_BlackBears/other
 cp forc* /home/jdrobins/CGA_BlackBears/other
 

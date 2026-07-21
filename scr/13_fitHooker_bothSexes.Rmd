@@ -16,16 +16,17 @@ Here, we attempt to use Hooker et al. (2020)'s code (from [github.com/rbchan/ga-
 The`JAGS` model from the Hooker manuscript is modified extensively below. Specifically, we remove the density-dependence of per-capita recruitment (with only 1 recruitment period, this should have little effect on the model). We also fit the model to data from both sexes and include several sex-specific parameters. We model differences in the sexes for the following: 
 
 i. $p_0$ - baseline detection probability, probability of detection when an individual's activity center is in the same location as a hair snare
-ii. `behave` - the (local) behavioral effect of capture, assumed to increase $p_0$ for individuals that have previously been detected in a specific location 
+ii. $\kappa$ - the (local) behavioral effect of capture, assumed to increase $p_0$ for individuals that have previously been detected in a specific location 
 iii. $\sigma$ - the decay rate of detection probability with distance (related to movement)
 iv. $\phi$ - (apparent) survival rate between primary sampling periods (years)
-v. $\psi$ - the data augmentation parameter
+v. $\gamma$ - recruitment rate, which includes survival until bears are old enough to show up in our hair snare samples
+vi. $\psi$ - the data augmentation parameter, as males and females are separated in the model
 
 We augment the male and female capture histories separately, so much of the code in the model is duplicated. This also means we have separate objects in the model for the male and female activity centers, individual alive/dead/available statuses, and so on. We will need to initialize these variables separately for males and females, so there will be a bit more to organize in the `JAGS data` and `inits` portions.  
 
 Here's the `JAGS` model we're using...  
 ```{r JAGSmodelCode}
-writeLines(readLines("../input/HookerModel-noDensDep_bothSexes2.jag"))
+writeLines(readLines("../input/CGA_SCR.jag"))
 ```
 
 ## Load the data
@@ -388,7 +389,7 @@ ji <- function() {
   p0i[,,2] <- matrix(runif(2*nYears), 2, nYears)
   out <- list(zF=zFi, zM=zMi, sF=sFi, sM=sMi, p0st=p0i, 
               sigma=runif(2, 3000, 4000), 
-              behave=runif(2, 0.5, 1),
+              kappa=runif(2, 0.5, 1),
               psi=matrix(c(runif(2), rep(NA, nYears)), 2, nYears),
               phi=runif(2), #!# Added this, we didn't draw init. phi before?
               gamma=runif(1, 0.2, 0.3)) 
@@ -427,7 +428,7 @@ for(i in closer.look) {
 
 
 #### Parameters to monitor
-jp <- c("p0st", "sigma", "behave", "gamma", "phi", "psi",
+jp <- c("p0st", "sigma", "kappa", "gamma", "phi", "psi",
         "EN", "N", "ENf", "Nf", "ENm", "Nm", "Ntotal", "totF", "totM",
         "ED", "RD", "EDf", "RDf", "EDm", "RDm",
         "survivingF", "survivingM", "recruitF", "recruitM",
@@ -460,14 +461,14 @@ system.time({
         library(rjags)
         load.module("dic")
         load.module("glm")
-        mod <- jags.model(file="../input/HookerModel-noDensDep_bothSexes2.jag",
+        mod <- jags.model(file="../input/CGA_SCR.jag",
                          data=jd, inits=ji,
                          n.chains=1, n.adapt=1000) 
         return(mod)
     })
 }) 
 
-save(adapt, file="adapt-bothSexes2.gzip")
+save(adapt, file="adapt-bothSexes.gzip")
 
 
 
@@ -487,7 +488,7 @@ system.time({
 
 
 
-save(samples, file="samples-bothSexes2.gzip")
+save(samples, file="samples-bothSexes.gzip")
 
 ```
 
@@ -500,11 +501,11 @@ Now to plot a couple of posteriors and save the workspace for further analysis.
 mc1 <- as.mcmc.list(samples)
 
 focal.parms <- c("Nf[1]","Nf[2]","Nm[1]","Nm[2]",
-                 "sigma[1]","sigma[2]","phi[1]","phi[2]","gamma",
+                 "sigma[1]","sigma[2]","phi[1]","phi[2]","gamma[1]","gamma[2]",
                  "lambdaF", "lambdaM", "lambda",
                  "p0st[1,1,1]","p0st[1,1,2]","p0st[1,2,1]","p0st[1,2,2]",
                  "p0st[2,1,1]","p0st[2,1,2]","p0st[2,2,1]","p0st[2,2,2]",
-                 "behave[1]","behave[2]")
+                 "kappa[1]","kappa[2]")
 
 # Posterior summary
 summary(mc1[,focal.parms])
@@ -631,10 +632,10 @@ addscalebar(pos="topleft", htin=0.07, plotepsg =32617,
 Save the workspace and quit
 ```{r saveQuit}
 # Save the mcmc lists as an Rda file
-save(mc1, file="mc1-bothSexes2.Rda")
+save(mc1, file="mc1-bothSexes.Rda")
 
 # Save the entire workspace
-save.image(file="Hooker_bothSexes2.Rws")
+save.image(file="Hooker_bothSexes.Rws")
 
 ```
 

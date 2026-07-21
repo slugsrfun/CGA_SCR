@@ -9,19 +9,15 @@ Data analyses for central GA black bear SCR / PopGen project at UGA
     + `0_build_ve.sh` - script used (interactively) to build the virtual environment for analyses that follow
     + `veGAbears_pkglist.txt` - explicit list of packages installed in creation of the virtual environment `veGAbears`
 + `/input/` - variety of files needed as input in analysis scripts
-    + `CGA_info.txt` & `CGA_option.txt` - input files for `NeEstimator` (see `21_effectiveSize`)
+    + `CGA_SCR.jag` - `JAGS` model modified from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), without density-dependent recruitment and modeling both sexes in the same analysis (two separate capture history objects)
     + `CGAmortalities.csv` - DNR records on mortality due to legal harvest, illegal take, and roadkill in the central GA black bear population
     + `Clearcut` - polygon of Southern Timber clearcut boundaries (shapefile format) for solar farm project (2023-2024) 
     + `colonydat_create2.R` - modified version of function to create `COLONY` input files, from [Ellie Weise's GitHub](https://github.com/weiseell/NbdLamprey/blob/master/Homebrew/colonydat_create.R)
     + `Finalized Hair Samples w Metadata_Carr` - information on the locations (hair snares), weeks, and years where samples were collected along with sample IDs (both `.csv` and `.xlsx` versions)
-    + `forc-h0.gzip` - forecasted abundance from PVA simulations under status quo harvest, created during `24_assessPVA`
-    + `forc-h5.gzip` - forecasted abundance from PVA simulations with 5 additional female mortalities, created during `24_assessPVA`
-    + `forc-h10.gzip` - forecasted abundance from PVA simulations with 10 additional female mortalities, created during `24_assessPVA`
     + `GTSeek_rd#_Metadata.csv` - four files of metadata for samples submitted to GTSeek (samples were submitted in four batches - `rd1`, `rd2`, `rd3`, and `rd4` in the filename)
     + `Hair Snare Summaries (Both Years)` - separate tabs with 2023 and 2024 hair snares, locations, dates checked, etc. converted to separate `.csv` files for analyses
         + `HS23_coords.csv` - hair snare IDs, landowners, GPS coordinates, and dates installed and baited for snares in 2023
         + `HS24_coords.csv` - hair snare IDs, landowners, GPS coordinates, and dates installed and baited for snares in 2024
-    + `HookerModel-noDensDep_bothSexes2.jag` - `JAGS` model modified from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), without density-dependent recruitment and modeling both sexes in the same analysis (two separate capture history objects)
     + `makeCH.R` - function to build a capture history from clone ID information (used in `makeCapHist` below)
     + `state-space360.tif` - state space as defined by [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), raster saved in `.tif` format
     + `sumstats_4d.R` - functions to calculate summary statistics from 3-d and 4-d capture history arrays (based on a function from Andy Royle's [`scrbook` R package](https://github.com/jaroyle/scrbook))
@@ -53,10 +49,14 @@ Data analyses for central GA black bear SCR / PopGen project at UGA
 + `/scr/` - spatial capture-recapture modeling
     + `11_makeCapHist` - create a capture history object for SCR modeling
         + `CGA_CH.Rda` - saved capture history objects created in the step above
-    + `23_fitHooker_bothSexes2` - fit a version of the Hooker et al. (2020) model that incorporates data from both male and female bears, using separate capture history objects
+    + `13_fitHooker_bothSexes2` - fit a version of the Hooker et al. (2020) model that incorporates data from both male and female bears, using separate capture history objects
 + `/other/` - additional analyses that don't fit into the categories above
-    + `24_assessPVA` - comparing abundances estimated in our SCR models to predictions from the PVA of Hooker et al. (2020), given observed mortalities
-        
+    + `14_assessPVA` - comparing abundances estimated in our SCR models to predictions from the PVA of Hooker et al. (2020), given observed mortalities
+    + `forc-h0.gzip` - forecasted abundance from PVA simulations under status quo harvest, created during `14_assessPVA`
+    + `forc-h5.gzip` - forecasted abundance from PVA simulations with 5 additional female mortalities, created during `14_assessPVA`
+    + `forc-h10.gzip` - forecasted abundance from PVA simulations with 10 additional female mortalities, created during `14_assessPVA`
+    + `forc-h20.gzip` - forecasted abundance from PVA simulations with 20 additional female mortalities, created during `14_assessPVA`
+    
 ## The pipeline / order of events for the analysis
 
 0. `setup/0_build_ve.sh` - create the virtual environment on the UGA cluster, install R packages, etc.
@@ -72,6 +72,6 @@ Data analyses for central GA black bear SCR / PopGen project at UGA
 10. `recaps/10_recapFinal` - combine output from `PLINK2` and `COLONY`, check for missed recaptures in duplicated samples, check sex inference in sets of recaptures, map inferred spatial recaptures, assign final `cloneID` and sex
 11. `scr/11_makeCapHist` - create capture histories for SCR analyses
 12. `recaps/12_recapMaps` - creating maps of detections for all individuals with spatial recaptures (run locally!)
-13. `scr/23_fitHooker_bothSexes2` - fit a version of the model from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) that incorporates data from both sexes in `rjags` - with separate data augmentation for males and females
-14. `other/24_assessPVA` - compare the abundance estimates from SCR models to predictions from PVA in [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), given information on mortalities
+13. `scr/13_fitHooker_bothSexes2` - fit a version of the model from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) that incorporates data from both sexes in `rjags` - with separate data augmentation for males and females
+14. `other/14_assessPVA` - compare the abundance estimates from SCR models to predictions from PVA in [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), given information on mortalities
 
