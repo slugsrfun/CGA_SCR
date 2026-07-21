@@ -55,6 +55,7 @@ Data analyses for central GA black bear SCR / PopGen project at UGA
     + `forc-h0.gzip` - forecasted abundance from PVA simulations under status quo harvest, created during `14_assessPVA`
     + `forc-h5.gzip` - forecasted abundance from PVA simulations with 5 additional female mortalities, created during `14_assessPVA`
     + `forc-h10.gzip` - forecasted abundance from PVA simulations with 10 additional female mortalities, created during `14_assessPVA`
+    + `forc-h15.gzip` - forecasted abundance from PVA simulations with 15 additional female mortalities, created during `14_assessPVA`
     + `forc-h20.gzip` - forecasted abundance from PVA simulations with 20 additional female mortalities, created during `14_assessPVA`
     
 ## The pipeline / order of events for the analysis
@@ -73,5 +74,5 @@ Data analyses for central GA black bear SCR / PopGen project at UGA
 11. `scr/11_makeCapHist` - create capture histories for SCR analyses
 12. `recaps/12_recapMaps` - creating maps of detections for all individuals with spatial recaptures (run locally!)
 13. `scr/13_fitHooker_bothSexes2` - fit a version of the model from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) that incorporates data from both sexes in `rjags` - with separate data augmentation for males and females
-14. `other/14_assessPVA` - compare the abundance estimates from SCR models to predictions from PVA in [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), given information on mortalities
+14. `other/14_assessPVA` - compare the abundance estimates from SCR models to predictions from PVA in [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), given information on known mortalities
 
