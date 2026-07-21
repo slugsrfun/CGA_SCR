@@ -392,7 +392,7 @@ ji <- function() {
               kappa=runif(2, 0.5, 1),
               psi=matrix(c(runif(2), rep(NA, nYears)), 2, nYears),
               phi=runif(2), #!# Added this, we didn't draw init. phi before?
-              gamma=runif(1, 0.2, 0.3)) 
+              gamma=runif(2, 0.2, 0.3)) 
   out$".RNG.name" <- "base::Mersenne-Twister" 
   out$".RNG.seed" <- sample.int(1e6, 1)
   return(out)
