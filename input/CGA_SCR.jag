@@ -3,7 +3,7 @@ model {
 	## Priors
 	# for sex-specific parameters
 	for(sx in 1:2) {
-		behave[sx] ~ dbeta(1,1) #behavioral effect of capture
+		kappa[sx] ~ dbeta(1,1) #behavioral effect of capture
 		phi[sx] ~ dbeta(1,1) #survival
 		sigma[sx] ~ dgamma(0.01, 0.01) #decay of det. prob. with dist.
 		gamma[sx] ~ dexp(1/0.5) #per-capita recruitment (for each sex, not combined)
@@ -12,7 +12,7 @@ model {
 		for(t in 1:nYears) {
 			#baseline det. prob.
 			p0st[sx,t,2] ~ dbeta(1,1) #previously captured individuals
-			p0st[sx,t,1] <- p0st[sx,t,2]*behave[sx] #naive individuals
+			p0st[sx,t,1] <- p0st[sx,t,2]*kappa[sx] #naive individuals
 		}
 		psi[sx,1] ~ dbeta(1,1) #data augmentation - year 1
 	}
