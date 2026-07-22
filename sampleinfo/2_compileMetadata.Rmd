@@ -14,7 +14,7 @@ We need to build a file of metadata for the sample set. This will be added to as
 ## Input data needed
 We need a couple of pieces of information before we can compile the metadata for the samples.
 
-1. [`Finalized Hair Samples w Metadata_Carr.xlsx`](https://docs.google.com/spreadsheets/d/1aFwuOjzQTl1JsOWbV69sV86DnFRIKxEh/edit?usp=share_link&ouid=108908384617619788254&rtpof=true&sd=true) - contains information on the locations (hair snares), weeks, and years where samples were collected along with sample IDs (both the UGA ID and the original Rapid Genomics ID (plate and well)) - saved as a [`csv file`](https://drive.google.com/file/d/1NqIJ5AKxZHLEQ5cFM1hkVS0t1R6XuhpI/view?usp=share_link).
+1. [`Finalized Hair Samples w Metadata_Carr.xlsx`](https://docs.google.com/spreadsheets/d/1aFwuOjzQTl1JsOWbV69sV86DnFRIKxEh/edit?usp=share_link&ouid=108908384617619788254&rtpof=true&sd=true) - contains information on the locations (hair snares), weeks, and years where samples were collected along with sample IDs (both the UGA ID and the Rapid Genomics ID (plate and well)) - saved as a [`csv file`](https://drive.google.com/file/d/1NqIJ5AKxZHLEQ5cFM1hkVS0t1R6XuhpI/view?usp=share_link).
 2. [`UGA_173101_Summary_Sheet.csv`](https://drive.google.com/file/d/1rlxvTYN_IfvMxDyttRM-cp46UNn7B416/view?usp=share_link) - includes information on the final Rapid Genomics ID (plate and well when sequenced), the name of the corresponding fastq file, and the original customer code (UGA ID above). Use this to match `rgID` to `ugaID`.
 
 ## Overview of metadata file
@@ -31,7 +31,7 @@ The file we build will have the following columns...
 9. `fqfile` - The fastq file for this sample
 10. `knownSEX` - known sex, where available
 11. `sampSOURCE` - source of the sample (hair snare, etc.)
-12. `region` - region (population)
+12. `region` - region (population) where the sample was collected
 
 
 ## Compile Metadata
@@ -43,14 +43,8 @@ head(translatable)
 
 #Weird samples... 
 smsht$Customer_Code[!smsht$Customer_Code %in% sampinfo$Hair.ID]
-#There are 3 samples where Customer_Code doesn't match 
-# hairIDs from the Finalized Hair Samples file
-#    rows 17, 51, and 452 (M21.1, M22.6, 1183-B.13)
-# What are these samples???
-#  After checking the intermediate files...
+#After checking the intermediate files...
 # 1183-B.13 is 91.B.13
-# M21.1 and M22.6 are from a plate 14 (WA02), which we don't have??
-#What are these 2 samples??
 smsht$Customer_Code[smsht$Customer_Code == "1183-B.13"] <- "91.B.13"
 smsht[!smsht$Customer_Code %in% sampinfo$Hair.ID,]
 
