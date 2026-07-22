@@ -38,7 +38,8 @@ R
 install.packages("/home/jdrobins/scrbook/Rpackage/scrbook", repos=NULL, type = "source")
 install.packages(c("tinytex","knitr","R2jags","rjags","nimble","nimbleSCR","usmap","sf","shapefiles","plotrix","rmarkdown", "igraph","vcfR","adegenet","pegas","raster","codetools","prettymapr"))
 install.packages("network")
-install.packages("areaplot"")
+install.packages("areaplot")
+install.packages("kldest")
 
 #Test that installation worked for all packages above
 library(tinytex)
@@ -64,6 +65,7 @@ library(network)
 library(scales)
 library(vegan) 
 library(areaplot)
+library(kldest)
 
 #Once they're all installed, quit R
 quit()
