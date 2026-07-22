@@ -26,7 +26,7 @@ After all of these filters, the file `LGC_SCR.vcf` will contain SNP genotypes fo
 ## Step 0: Clean the raw VCF
 First, copy the files and create some summaries of average depth, per-individual missing data, and per-genotype depth.  
 ```{r engine="bash", comment=""}
-cd /scratch/jdrobins/CGA_BlackBears/snpfiltering
+cd /scratch/jdrobins/CGA_SCR/snpfiltering
 
 cp ../../LGC_BlackBears/UGA_173101/Delivery-20250620_merged/VCFs/UGA_173101_SNPs_Raw.vcf ./
 

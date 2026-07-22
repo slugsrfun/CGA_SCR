@@ -13,7 +13,7 @@ The `COLONY` job ran successfully in ~10 hours (using the parallel `COLONY` exec
 
 In this markdown, we read in the outputs from `COLONY` and calculate a few basic summaries...  
 ```{r readCOLout}
-col.out <- read.table("/home/jdrobins/CGA_BlackBears/recaps/CGA.BestClone", 
+col.out <- read.table("/home/jdrobins/CGA_SCR/recaps/CGA.BestClone", 
                       header = TRUE)
 
 col.list <- vector("list", nrow(col.out))

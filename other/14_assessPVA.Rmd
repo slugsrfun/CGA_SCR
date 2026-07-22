@@ -357,7 +357,7 @@ list.files()
 
 ## Load SCR data
 #load("../data/ga_bear_data_females.gzip")
-load("fromRepo/ga_bear_data_females.gzip")
+load("../input/fromRepo/ga_bear_data_females.gzip")
 
 ## Inspect the loaded data objects
 str(ch4d.f)
@@ -443,7 +443,7 @@ xlim0 <- x.range+c(-buffer, buffer)
 ylim0 <- y.range+c(-buffer, buffer)
 
 #S360 <- raster("../data/state-space360.tif")
-S360 <- raster("fromRepo/state-space360.tif")
+S360 <- raster("../input/fromRepo/state-space360.tif")
 
 traps.in <- extract(S360, traps)
 
@@ -600,7 +600,7 @@ system.time({
         load.module("dic")
         load.module("glm")
         #jm <- jags.model(file="dT-s0-rPDD2-phi0-pYB-sig0.jag",
-        jm <- jags.model(file="fromRepo/dT-s0-rPDD2-phi0-pYB-sig0.jag",
+        jm <- jags.model(file="../input/fromRepo/dT-s0-rPDD2-phi0-pYB-sig0.jag",
                          data=jd, inits=ji,
                          n.chains=1, n.adapt=500)
         return(jm)
@@ -694,7 +694,7 @@ We then use the [`forecast_fn.R`](https://github.com/rbchan/ga-bear-pva/blob/mas
 library(coda)
 
 #source("forecast_fn.R")
-source("fromRepo/forecast_fn.R")
+source("../input/fromRepo/forecast_fn.R")
 
 args(forecast)
 
