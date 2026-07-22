@@ -1,0 +1,935 @@
+---
+title: "Assessing PVA Predictions"
+author: "John D. Robinson"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+linkcolor: blue
+---
+
+# Background
+[Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) used noninvasive sampling and spatial capture-recapture models to estimate the abundance of female black bears in central Georgia. Their analysis yielded point estimates of $N_t$ between 106 and 166 using samples collected between 2012 and 2016. Using the parameterized model, Hooker et al. (2020) also conducted population viability analyses (PVA) for the central GA black bear population. They projected abundance 50 years into the future using survival and density-dependent recruitment rates under management scenarios where a Poisson-distributed number of additional females (above current levels) were removed from the population by harvest. They evaluated *status quo* simulations (no additional harvest) and four alternatives where the mean of the Poisson was set to $h=5$, 10, 15, or 20 females (above *status quo* levels) were removed from the population by harvest. They found that 50-year extinction risk remained <1% in both the *status quo* and $h=5$ simulations (see Figure 6 of [Hooker et al. 2020](https://doi.org/10.1002/jwmg.21887)).  
+
+In this markdown, we will revisit predictions from these simulations and use data for *known* female mortalities (which likely underestimates total mortality) to assess i) which scenario considered in the PVA from Hooker et al. (2020) is most similar to the recent past in central GA and ii) whether estimates of abundance from the present study (see `23_fitHooker_bothSexes2`) align with simulation predictions under this scenario.  
+
+This markdown will cover the following analyses:
+
+i. Characterize observed mortality levels in central Georgia (for comparison to alternative scenarios considered in Hooker et al. (2020))
+ii. 
+
+---
+
+# Observed mortalities in central Georgia
+The Georgia Department of Natural Resources retains records of central GA black bear mortalities due to legal harvest, illegal take, and vehicular collisions. We will use those records to:
+
+i. Visualize trends in mortality from these sources over time
+ii. Calculate average numbers of deaths for several time windows
+    + pre-2012: before the Hooker et al. (2020) study period
+    + 2012-2016: the Hooker et al. (2020) study period, corresponding most closely to rates in their PVA
+    + 2017-2024: prior to, and including, the current study period
+iii. Assess predictions from the PVA in Hooker et al. (2020), given female abundance estimates from our model (`14_fitHooker`) and observed female mortalities
+
+## Dataset
+First load the dataset. The `.csv` file in the repository transposes data from [this spreadsheet](https://docs.google.com/spreadsheets/d/1yB5SA1m_o_DdZ2nwu5-eu565oiii7jqk/edit?usp=sharing&ouid=108908384617619788254&rtpof=true&sd=true) (see the `CGA Trends` tab). Below, we read the data into R, and create subsets for the two sexes and the different sources of mortality.  
+```{r loadData}
+mort <- read.csv("../input/CGAmortalities.csv", header = TRUE)
+mort
+
+#total mortality by sex
+total.male <- rowSums(mort[,which(colnames(mort) %in% c("harvestM",
+                                                        "illegalM",
+                                                        "roadM"))])
+
+total.female <- rowSums(mort[,which(colnames(mort) %in% c("harvestF",
+                                                          "illegalF",
+                                                          "roadF"))])
+#Combined
+all.mort <- data.frame(year = mort$year,
+                        harvest = mort$harvestM+mort$harvestF+mort$harvestU,
+                        illegal = mort$illegalM+mort$illegalF+mort$illegalU,
+                        road = mort$roadM+mort$roadF+mort$roadU)
+total.all <- rowSums(all.mort[,-1])
+```
+
+## Visualize trends
+Now to visualize trends through time in the different sources.  
+
+### Both sexes
+First, for all black bears in central GA.  
+```{r bothPlot}
+all.mort
+
+library(scales)
+color.pal <- c(alpha("black", 0.6),
+               alpha("royalblue", 0.6),
+               alpha("orange", 0.6),
+               alpha("darkred",0.6))
+
+#As a scatter plot
+plot(total.all ~ all.mort$year, 
+     type = "b", lwd = 1.5, pch=19, col = color.pal[1], 
+     ylim = c(-2.5,(max(total.all)+5)),
+     xlab = "Year", ylab = "Mortalities", main = "All Bears")
+lines(all.mort$harvest ~ all.mort$year, 
+      pch=19, type = "b", col = color.pal[2])
+lines(all.mort$illegal ~ all.mort$year, 
+      pch=19, type = "b", col = color.pal[3])
+lines(all.mort$road ~ all.mort$year, 
+      pch=19, type = "b", col = color.pal[4])
+legend("topleft", cex = 0.75, bty="n", 
+       lty=1, pch=19, col=color.pal,
+       legend=c("Total","Legal Harvest","Illegal Take","Roadkill"))
+
+#As an area chart
+library(areaplot)
+?areaplot()
+areaplot(x=mort$year,
+         y=all.mort[,-1],
+         col=color.pal[2:4],
+         xlab = "Year", ylab = "Mortalities", main = "All Bears")
+legend("topleft", cex = 0.75, bty="n", 
+       fill=color.pal[2:4],
+       legend=c("Legal Harvest","Illegal Take","Roadkill"))
+
+
+```
+
+### Females
+Now for females only...  
+```{r femPlot}
+mort[,which(colnames(mort) %in% c("year","harvestF","illegalF","roadF"))]
+mean(total.female)
+
+#Scatter plot
+plot(total.female ~ mort$year, 
+     type = "b", lwd = 1.5, pch=19, col = color.pal[1], 
+     ylim = c(-2.5,(max(total.female)+5)),
+     xlab = "Year", ylab = "Mortalities", main = "Females")
+lines(mort$harvestF ~ mort$year, 
+      pch=19, type = "b", col = color.pal[2])
+lines(mort$illegalF ~ mort$year, 
+      pch=19, type = "b", col = color.pal[3])
+lines(mort$roadF ~ mort$year, 
+      pch=19, type = "b", col = color.pal[4])
+legend("topleft", cex = 0.75, bty="n", 
+       lty=1, pch=19, col=color.pal,
+       legend=c("Total","Legal Harvest","Illegal Take","Roadkill"))
+
+#Area chart
+areaplot(x=mort$year,
+         y=cbind(mort$harvestF, mort$illegalF, mort$roadF),
+         col=color.pal[2:4],
+         xlab = "Year", ylab = "Mortalities", main = "Females")
+legend("topleft", cex = 0.75, bty="n", 
+       fill=color.pal[2:4],
+       legend=c("Legal Harvest","Illegal Take","Roadkill"))
+```
+
+Notice from this plot that vehicular collisions are fairly rare in females.  
+
+### Males
+```{r malePlot}
+mort[,which(colnames(mort) %in% c("year","harvestM","illegalM","roadM"))]
+mean(total.male)
+
+#Scatter plot
+plot(total.male ~ mort$year, 
+     type = "b", lwd = 1.5, pch=19, col = color.pal[1], 
+     ylim = c(-2.5,(max(total.male)+5)),
+     xlab = "Year", ylab = "Mortalities", main = "Males")
+lines(mort$harvestM ~ mort$year, 
+      pch=19, type = "b", col = color.pal[2])
+lines(mort$illegalM ~ mort$year, 
+      pch=19, type = "b", col = color.pal[3])
+lines(mort$roadM ~ mort$year, 
+      pch=19, type = "b", col = color.pal[4])
+legend("topleft", cex = 0.75, bty="n", 
+       lty=1, pch=19, col=color.pal,
+       legend=c("Total","Legal Harvest","Illegal Take","Roadkill"))
+
+#Area chart
+areaplot(x=mort$year,
+         y=cbind(mort$harvestM, mort$illegalM, mort$roadM),
+         col=color.pal[2:4],
+         xlab = "Year", ylab = "Mortalities", main = "Males")
+legend("topleft", cex = 0.75, bty="n", 
+       fill=color.pal[2:4],
+       legend=c("Legal Harvest","Illegal Take","Roadkill"))
+```
+
+Notice from the plot above that the vast majority of male mortality is due to vehicular collisions. 
+
+Out of curiosity, we can look for differences in mortality rates for males and females.  
+```{r testDiff}
+#Total
+t.test(total.female, total.male, paired="T")
+boxplot(total.female, total.male, 
+        names = c("F","M"), 
+        ylab = "Total Mortalities")
+
+#Legal Harvest
+t.test(mort$harvestF, mort$harvestM, paired = "T")
+boxplot(mort$harvestF, mort$harvestM,
+        names = c("F","M"),
+        ylab = "Legal Harvest")
+
+#Illegal Take
+t.test(mort$illegalF, mort$illegalM, paired = "T")
+boxplot(mort$illegalF, mort$illegalM,
+        names=c("F","M"),
+        ylab = "Illegal Take")
+
+#Roadkill
+t.test(mort$roadF, mort$roadM, paired = "T")
+boxplot(mort$roadF, mort$roadM,
+        names = c("F","M"),
+        ylab = "Roadkill")
+```
+
+From the quick comparisons above, it appears that total mortality is higher in males. However, legal harvest numbers are higher in females than in males, possibly due to male bears leaving the study area during the winter. This difference is more than offset by the large difference in mortality due to vehicular collisions.  
+
+
+## Average mortality numbers 
+To compare our abundance estimates to the predictions from simulations in Hooker et al. (2020), we first need to characterize the average total mortalities for a few different periods. This way we can say that mortality since the period covered by the Hooker et al. (2020) analysis represents their baseline +/- $n$ additional females.  
+
+### Pre 2012
+These numbers won't be directly used, they're included only for the sake of completeness.  
+```{r preHooker}
+#Combined
+total.all[which(mort$year < 2012)]
+mean(total.all[which(mort$year < 2012)])
+median(total.all[which(mort$year < 2012)])
+
+#Females
+total.female[which(mort$year < 2012)]
+mean(total.female[which(mort$year < 2012)])
+median(total.female[which(mort$year < 2012)])
+
+#Males
+total.male[which(mort$year < 2012)]
+mean(total.male[which(mort$year < 2012)])
+median(total.male[which(mort$year < 2012)])
+```
+
+### 2012-2016 
+Now mortalities for the Hooker et al. (2020) study period.  
+```{r HookerPeriod}
+#Combined
+total.all[which(mort$year %in% c(2012:2016))]
+mean(total.all[which(mort$year %in% c(2012:2016))])
+median(total.all[which(mort$year %in% c(2012:2016))])
+
+#Females
+total.female[which(mort$year %in% c(2012:2016))]
+mean(total.female[which(mort$year %in% c(2012:2016))])
+median(total.female[which(mort$year %in% c(2012:2016))])
+
+#Males
+total.male[which(mort$year %in% c(2012:2016))]
+mean(total.male[which(mort$year %in% c(2012:2016))])
+median(total.male[which(mort$year %in% c(2012:2016))])
+```
+
+### 2016-2024
+And for the period since the Hooker study...  
+```{r postHooker}
+#Combined
+total.all[which(mort$year %in% c(2017:2024))]
+mean(total.all[which(mort$year %in% c(2017:2024))])
+median(total.all[which(mort$year %in% c(2017:2024))])
+
+#Females
+total.female[which(mort$year %in% c(2017:2024))]
+mean(total.female[which(mort$year %in% c(2017:2024))])
+median(total.female[which(mort$year %in% c(2017:2024))])
+
+#Males
+total.male[which(mort$year %in% c(2017:2024))]
+mean(total.male[which(mort$year %in% c(2017:2024))])
+median(total.male[which(mort$year %in% c(2017:2024))])
+```
+
+### How many additional mortalities?
+Comparing recent female mortality numbers to the Hooker et al. (2020) study period...  
+```{r postVHooker}
+#Hooker period
+mean(total.female[which(mort$year %in% c(2012:2016))])
+median(total.female[which(mort$year %in% c(2012:2016))])
+
+#post-Hooker period
+mean(total.female[which(mort$year %in% c(2017:2024))])
+median(total.female[which(mort$year %in% c(2017:2024))])
+
+#In comparisons below
+# positive numbers mean lower contemporary mortality!
+
+#Difference b/w '12-'16 mean & recent mean
+mean(total.female[which(mort$year %in% c(2012:2016))]) - 
+  mean(total.female[which(mort$year %in% c(2017:2024))])
+median(total.female[which(mort$year %in% c(2012:2016))]) -
+  median(total.female[which(mort$year %in% c(2017:2024))])
+
+#Difference b/w '12-'16 mean & max recent annual mortality?
+mean(total.female[which(mort$year %in% c(2012:2016))]) - 
+  max(total.female[which(mort$year %in% c(2017:2024))])
+median(total.female[which(mort$year %in% c(2012:2016))]) -
+  max(total.female[which(mort$year %in% c(2017:2024))])
+
+#Annual difference to '12-'16 means
+mean(total.female[which(mort$year %in% c(2012:2016))]) - 
+  total.female[which(mort$year %in% c(2017:2024))]
+median(total.female[which(mort$year %in% c(2012:2016))]) -
+  total.female[which(mort$year %in% c(2017:2024))] -
+  
+
+#Individual sources
+#Legal harvest?
+mean(mort$harvestF[which(mort$year %in% c(2012:2016))]) - 
+  mean(mort$harvestF[which(mort$year %in% c(2017:2024))])
+median(mort$harvestF[which(mort$year %in% c(2012:2016))]) - 
+  median(mort$harvestF[which(mort$year %in% c(2017:2024))])
+
+#Roadkill?
+mean(mort$roadF[which(mort$year %in% c(2012:2016))]) - 
+  mean(mort$roadF[which(mort$year %in% c(2017:2024))])
+median(mort$roadF[which(mort$year %in% c(2012:2016))]) - 
+  median(mort$roadF[which(mort$year %in% c(2017:2024))])
+
+
+```
+
+In fact, mean and median female mortality numbers are lower than they were during the Hooker et al. (2020) study period. The *maximum* single year total mortality of females since the Hooker et al. (2020) study is **`r abs(mean(total.female[which(mort$year %in% c(2012:2016))]) - max(total.female[which(mort$year %in% c(2017:2024))]))` bears** above the mean for their study period. Annual female mortality since 2017 has exceeded the average from the Hooker et al. (2020) study period in `r sum(total.female[which(mort$year %in% c(2017:2024))] > mean(total.female[which(mort$year %in% c(2012:2016))]))` years (2021-2024).  
+```{r plotTotVHooker}
+plot(total.female[which(mort$year < 2025)] ~ mort$year[which(mort$year < 2025)], 
+     type = "b", lwd = 1, col="black", pch=19, 
+     xlab = "Year", ylab = "Total Mortality", main = "Females")
+abline(h = mean(total.female[which(mort$year %in% c(2012:2016))]), 
+       lty = 3, col="red", lwd = 2)
+legend("topleft", bty="n", cex = 0.75, 
+       lty=c(1,3), pch=c(19,19), pt.cex=c(1,0), lwd = c(1,2), 
+       col = c("black","red"), 
+       legend = c("Observed","Mean: 2012-2016"))
+polygon(x=c(2011.75,2011.75,2016.25,2016.25),y=c(-100,100,100,-100),
+        col=alpha("grey",0.2), lty=2, lwd = 0.5)
+text(x=2012, y=17, labels="Hooker et al. (2020)", cex=0.65, adj=0)
+polygon(x=c(2016.75,2016.75,2024.25,2024.25),y=c(-100,100,100,-100),
+        col=alpha("lightgreen",0.2), lty=2, lwd = 0.5)
+text(x=2024, y=17, labels="Assessment period", cex=0.65, adj=1)
+
+#Number of additional mortalities, above 2012-2016 average, for 2021-2024
+total.female[which(mort$year %in% c(2021:2024))] - 
+  mean(total.female[which(mort$year %in% c(2012:2016))])
+```
+
+In terms of the two major sources of mortality, average legal harvests since 2017 are down by `r mean(mort$harvestF[which(mort$year %in% c(2012:2016))]) - mean(mort$harvestF[which(mort$year %in% c(2017:2024))])` bears, while average vehicular collision mortalities are up by `r abs(mean(mort$roadF[which(mort$year %in% c(2012:2016))]) - mean(mort$roadF[which(mort$year %in% c(2017:2024))]))` bear.  
+
+---
+
+# Assess PVA predictions
+Given the female mortalities observed since the Hooker et al. (2020) study period, and the lower mean annual harvest numbers, management of the central GA black bear harvest has been effective at limiting annual female mortality.  
+
+The average total *known* female mortality since the Hooker et al. (2020) study (`r mean(total.female[which(mort$year %in% c(2017:2024))])`) was below the average total mortality from the Hooker et al. (2020) study period (`r mean(total.female[which(mort$year %in% c(2012:2016))])`), while the maximum single-year mortality since 2016 (`r max(total.female[which(mort$year >= 2017)])` females in `r mort$year[which(mort$year >= 2017 & total.female == max(total.female[which(mort$year >= 2017)]))]`) was slightly higher. Thus, observed total *known* female mortalities in the central GA are most consistent with the two most optimistic harvest scenarios from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), *status quo* or $h=5$ expected additional females harvested per year.  
+
+Under both of these scenarios, 50-year extinction risks in the PVA remained below 1%, and population size was relatively stable ([Hooker et al. 2020](https://doi.org/10.1002/jwmg.21887)). Quoting from their Discussion section:
+
+*From an abundance of 165 (95% CI = 134–206) in 2016, the 50‐year population forecasts (i.e., estimated abundance in the year 2067) for each of the 5 harvest scenarios in order of lowest to highest harvest were 169 (95% CI = 134–268), 159 (95% CI = 124–243), 147 (95% CI = 103–223), 132 (95% CI = 0–197), and 105 (95% CI = 0–174). Extinction probabilities for the status quo scenario (i.e., the lowest level of harvest of any of the scenarios) was negligible at <0.001% with no abundance projections falling to zero during the 50‐year timeline. Similarly, the scenario in which the status quo harvest was increased by 5 females had few projections in which abundance dropped to zero, resulting in an extinction risk of <1%.* --[Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887)  
+
+As expected from simulations conducted by Hooker et al. (2020), population size in central GA appears to be stable or increasing. In our analysis of a model very similar to that fit in Hooker et al. (2020), female abundance was estimated at 138 (95% HPD: 101-188) in 2023 and 166 (95% HPD: 133-208) in 2024 (see `23_fitHooker_bothSexes2`). Thus, our data are consistent with a female population that is approximately stable, or increasing, in central Georgia.  
+
+## Re-fit the Hooker model
+To quantify the degree to which our estimates of female abundance align with predictions from the population viability analyses of Hooker et al. (2020), we will first re-fit the model to capture data for female bears. The files needed to do this are available on the Hooker et al. (2020) [GitHub repository](https://github.com/rbchan/ga-bear-pva/tree/master): [`dT-s0-rPDD2-phi0-pYB-sig0.jag`](https://github.com/rbchan/ga-bear-pva/blob/master/R/dT-s0-rPDD2-phi0-pYB-sig0.jag), [`fit.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/fit.R), [`ga_bear_data_females.gzip`](https://github.com/rbchan/ga-bear-pva/blob/master/data/ga_bear_data_females.gzip), and [`state-space360.tif`](https://github.com/rbchan/ga-bear-pva/blob/master/data/state-space360.tif).  
+```{r redoFit}
+#Code below is copied from fit.R
+# paths to the JAGS model, capture history data, and state space file
+# are modified slightly
+
+
+## Fit open population SCR models to central GA black bear data
+## Female-only analysis
+
+library(rjags)
+library(lattice)
+library(raster)
+
+list.files()
+
+
+## Load SCR data
+#load("../data/ga_bear_data_females.gzip")
+load("fromRepo/ga_bear_data_females.gzip")
+
+## Inspect the loaded data objects
+str(ch4d.f)
+str(traps)
+
+## Check that traps are in the same order in both objects
+## Must be TRUE
+all(rownames(traps)==dimnames(ch4d.f)[[3]])
+all(rownames(oper)==rownames(traps))
+
+
+## Format data
+
+y <- ch4d.f ## 4D encounter histories
+str(y)
+
+y.dim <- dim(y)
+nBears <- y.dim[1]
+nTraps <- y.dim[2]
+nWeeks <- y.dim[3]
+nYears <- y.dim[4]
+M <- 500 # Data aug. Maximum number of bears that could have been alive
+
+all(rownames(prevcap.f)==rownames(y)) ## Must be TRUE
+
+## Non-spatial, robust design format
+y.nonsp.robust <- apply(y>0, c(1,3,4), any)*1L
+str(y.nonsp.robust)
+
+## Non-spatial, non-robust format
+y.nonsp.nonrobust <- apply(y.nonsp.robust>0,
+                           c(1,3), any)*1L
+str(y.nonsp.nonrobust)
+
+## Spatial, non-robust format
+y.sp.nonrobust <- apply(y>0, c(1,2,4), any)*1L
+str(y.sp.nonrobust)
+
+
+## First and last detections 
+first.det <- apply(y.nonsp.nonrobust>0, 1, function(x) min(which(x)))
+last.det <- apply(y.nonsp.nonrobust>0, 1, function(x) max(which(x)))
+known.alive <- last.det-first.det+1
+table(known.alive)
+
+
+## Data augmentation
+yaug <- array(0, c(M, nTraps, nWeeks, nYears))
+yaug[1:nBears,,,] <- y
+
+str(yaug)
+
+
+## Known values of the alive/dead state matrix
+zdata.aug <- matrix(NA, M, nYears)
+for(i in 1:nBears) {
+    zdata.aug[i,first.det[i]:last.det[i]] <- 1
+}
+
+## Visualize the observed information about lifetime
+image(t(zdata.aug[1:nBears,]))
+
+## Bears known to be alive in each year
+colSums(zdata.aug[1:nBears,], na.rm=TRUE)
+
+
+
+## Operational status of traps
+nTrapsYr <- colSums(oper)
+nTrapsYr
+oper.traps <- matrix(0L, nTraps, nYears)
+for(i in 1:nYears) {
+    oper.traps[1:nTrapsYr[i],i] <- which(oper[,i]==1)
+}
+
+
+
+## State-space
+x.range <- range(traps[,1])
+y.range <- range(traps[,2])
+buffer <- 4000
+xlim0 <- x.range+c(-buffer, buffer)
+ylim0 <- y.range+c(-buffer, buffer)
+
+#S360 <- raster("../data/state-space360.tif")
+S360 <- raster("fromRepo/state-space360.tif")
+
+traps.in <- extract(S360, traps)
+
+plot(S360)
+
+## Convert raster to a data.frame
+S360dat <- as.data.frame(S360, xy=TRUE)
+names(S360dat) <- c("x", "y", "S360")
+S360dat$x <- floor(S360dat$x)
+S360dat$y <- floor(S360dat$y)
+table(diff(S360dat$x))
+table(diff(S360dat$y))
+
+nPix360 <- nrow(S360dat)
+dist360 <- matrix(NA, nPix360, nTraps)
+for(j in 1:nTraps) {
+    dist360[,j] <- sqrt((S360dat$x-traps[j,1])^2 +
+                        (S360dat$y-traps[j,2])^2)
+}
+
+S360dat$pixIn <- (rowSums(dist360<buffer)>0)*1L
+table(S360dat$pixIn)
+
+dim.S360 <- dim(S360)
+
+S360dat$habitat <- ifelse((S360dat$S360>0) &
+                          (S360dat$pixIn>0),
+                          1L, 0L)
+
+## Visualize traps and state space
+levelplot(habitat ~ x+y, S360dat, aspect='iso',
+          panel=function(...) {
+              panel.levelplot(...)
+              lpoints(traps, pch=3)
+          })
+
+
+delta <- res(S360)[1]
+xseq <- sort(unique(S360dat$x))
+yseq <- sort(unique(S360dat$y), decreasing=TRUE)
+xlim <- range(xseq)+c(-delta/2,delta/2)
+ylim <- range(yseq)+c(-delta/2,delta/2)
+
+dim.S360
+range(ceiling((runif(1e5, xlim[1], xlim[2])-xlim[1])/delta))
+range(ceiling((ylim[2]-runif(1e5, ylim[1], ylim[2]))/delta))
+
+
+S <- matrix(S360dat$habitat, dim.S360[1], dim.S360[2],
+            dimnames=list(yseq, xseq), byrow=TRUE)
+str(S)
+
+plot(raster(S))
+
+sum(S)*delta^2 / 1e6 ## Area in km-sq
+
+
+## JAGS
+## Models are slow. About 450 iter/hr
+
+library(rjags)
+
+
+
+### Put the data in a list
+jd <- list(y=y, y.zero=matrix(0, M, nYears),
+           z=zdata.aug,
+           nBears=nBears, M=M,
+           nTrapsYr=as.integer(nTrapsYr),
+           nWeeks=nWeeks, nYears=nYears, nFuture=0,
+           oper.traps=oper.traps,
+           prevcap=prevcap.f+1,
+           S=S, delta=delta,
+           ones=matrix(1, M, nYears),
+           x=traps, xlim=xlim, ylim=ylim)
+jd$z=cbind(zdata.aug, matrix(NA, M, jd$nFuture))
+
+str(jd)
+
+
+#### Function to generate initial values
+ji <- function() {
+    nFuture <- jd$nFuture
+    nBears <- jd$nBears
+    M <- jd$M
+    nYears <- jd$nYears
+    nWeeks <- jd$nWeeks
+    nFuture <- jd$nFuture
+    traps <- jd$x
+    nTraps <- nrow(traps)
+    zi <- matrix(0, M, nYears+nFuture)
+    ## Avoid N[t]=0, which causes problems with inital values of lambda
+    if(nFuture>0)
+        zi[(M-5):M,(nYears+1):(nYears+nFuture)] <- 1
+    si1 <- traps[sample.int(nTraps, size=M, replace=TRUE,
+                            prob=traps.in),]
+    si.rec <- si <- array(NA, c(M, 2, nYears))
+    si[,,1] <- si1
+    si.rec[,,-1] <- si1
+    for(i in 1:nBears) {
+        zi[i,first.det[i]:last.det[i]] <- NA
+        traplocs.i <- (rowSums(jd$y[i,,,])>0) * traps.in
+        if(all(!traplocs.i))
+            next
+        si[i,,1] <- colMeans(traps[traplocs.i,,drop=FALSE])
+        si.rec[i,,-1] <- colMeans(traps[traplocs.i,,drop=FALSE])
+    }
+    p0i <- array(NA, c(nWeeks, nYears, 2))
+    p0i[,,2] <- matrix(runif(nWeeks*nYears), nWeeks, nYears)
+    out <- list(z=zi, s=si, s.rec=si.rec, p0=p0i,
+                sigma=runif(1, 3000, 4000), behave=runif(1, 0.5, 1),
+                mu.lphi=0, sig.lphi=.01,
+                psi=c(runif(1), rep(NA, nYears+nFuture-1)),
+                igamma0=runif(1, 0.2, 0.3), gamma1=runif(1, 0, 0.001))
+    out$".RNG.name" <- "base::Mersenne-Twister" 
+    out$".RNG.seed" <- sample.int(1e6, 1)
+    return(out)
+}
+
+str(ji())
+
+## Visualize initial values of activity centers
+plot(raster(S, xmn=xlim[1], ymn=ylim[1], xmx=xlim[2], ymx=ylim[2]))
+points(ji()$s[,,1])
+points(ji()$s.rec[,,2], pch=16, col=3)
+rect(xlim[1], ylim[1], xlim[2], ylim[2], border="blue")
+#symbols(Sx, Sy, circles=rep(buffer, length(Sx)),
+#        fg="blue", add=TRUE, inches=FALSE)
+
+
+#### Parameters to monitor
+jp <- c("p0", "sigma", "behave", 
+        "igamma0", "gamma0", "gamma1", "phi", "gamma", "EN", 
+        "N", "Ntotal", "survivors", "recruits", "lambda")
+
+
+## Models in parallel with WAIC computation
+
+library(parallel)
+
+(nCores <- max(1, min(detectCores()-1, 4)))
+
+cl1 <- makeCluster(nCores)
+
+clusterExport(cl1, c("jd", "ji", "jp",
+                     "traps.in", "first.det", "last.det"))
+
+## Compile and adapt. Comment out next line if you don't want reproducible results
+clusterSetRNGStream(cl1, iseed=389761)
+
+system.time({
+    jm.out <- clusterEvalQ(cl1, {
+        library(rjags)
+        load.module("dic")
+        load.module("glm")
+        #jm <- jags.model(file="dT-s0-rPDD2-phi0-pYB-sig0.jag",
+        jm <- jags.model(file="fromRepo/dT-s0-rPDD2-phi0-pYB-sig0.jag",
+                         data=jd, inits=ji,
+                         n.chains=1, n.adapt=500)
+        return(jm)
+    })
+}) ## Approx 1.5 hr
+
+
+save(jm.out, file="jm.gzip")
+
+
+## Draw posterior samples, but don't monitor latent variables
+system.time({
+    jc1.out <- clusterEvalQ(cl1, {
+        jc1 <- coda.samples(model=jm,
+                            variable.names=c(jp, "deviance"),
+                            n.iter=5000)
+        return(as.mcmc(jc1))
+    })
+}) ## 450 iterations/hr
+
+
+save(jc1.out, file="jc1.gzip")
+
+
+## mc1 <- as.mcmc.list(jc1.out)
+## plot(mc1, ask=TRUE)
+
+## Draw some more samples, including the latent varialbes needed
+## for forecasting
+jc2.out <- clusterEvalQ(cl1, {
+    jc2 <- coda.samples(model=jm,
+                        variable.names=c(jp, "deviance", "z", "a","s"),
+                        n.iter=5000, n.thin=1)
+    return(as.mcmc(jc2))
+})
+
+
+
+save(jc2.out, file="jc2.gzip")
+
+rm(jc1.out, jc2.out)
+gc()
+
+
+## WAIC
+js3.out <- clusterEvalQ(cl1, {
+    js3 <- jags.samples(model=jm,
+                        variable.names=c("deviance","WAIC"),
+                        n.iter=5000, n.thin=1, type="mean")
+    return(js3)
+})
+
+
+save(js3.out, file="js3.gzip")
+
+
+
+## These additional samples aren't really necessary because the Markov
+## chains usually converge very rapidly
+jc4.out <- clusterEvalQ(cl1, {
+    jc4 <- coda.samples(model=jm,
+                        variable.names=c(jp, "deviance", "z", "a","s"),
+                        n.iter=5000, n.thin=1)
+    return(as.mcmc(jc4))
+})
+
+
+
+
+
+save(jc4.out, file="jc4.gzip")
+
+```
+
+The [`fit.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/fit.R) script continues, but the samples from the posterior distribution saved in `jc4.gzip` are what we need for the next steps, so we'll stop here.  
+
+Now summarize the posterior distribution, focusing on abundance and survival.  
+```{r posteriors}
+library(coda)
+summary(as.mcmc.list(jc4.out)[,c("N[1]","N[2]","N[3]","N[4]","N[5]","phi")])
+```
+
+## Forecast abundance
+We then use the [`forecast_fn.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/forecast_fn.R) and [`forecast.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/forecast.R) scripts from the [GitHub repository](https://github.com/rbchan/ga-bear-pva) associated with that project to recreate the forecasted population sizes.  
+```{r redoForc}
+#Code below is copied from forecast.R
+# the path to the forecast_fn.R script is modified slightly
+
+## Forecast Central GA black bear dynamics and viability
+
+library(coda)
+
+#source("forecast_fn.R")
+source("fromRepo/forecast_fn.R")
+
+args(forecast)
+
+
+## Load posterior samples
+load("jc4.gzip")
+jc4 <- as.mcmc.list(jc4.out)
+ps <- window(jc4, thin=10)
+
+niter(ps)*nchain(ps)
+
+
+
+
+## debugonce(forecast)
+
+
+## No harvest
+system.time({
+    forc.h0 <- forecast(ps, nFuture=50, M=15000,
+                        harvest=0, stochastic=TRUE,
+                        NbarSims=100,
+                        report=100)
+})
+
+save(forc.h0, file="forc-h0.gzip")
+
+
+
+## 5 additional females per year
+system.time({
+    forc.h5 <- forecast(ps, nFuture=50, M=15000,
+                        harvest=5, stochastic=TRUE,
+                        NbarSims=100,
+                        report=100)
+})
+
+save(forc.h5, file="forc-h5.gzip")
+
+
+
+## 10 additional females per year
+system.time({
+    forc.h10 <- forecast(ps, nFuture=50, M=15000,
+                         harvest=10, stochastic=TRUE,
+                         NbarSims=100,
+                         report=100)
+})
+
+save(forc.h10, file="forc-h10.gzip")
+
+```
+
+The [`forecast.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/forecast.R) script continues, but given the levels of mortality observed in the population since 2016, the results for *status quo* and 5 additional harvested females are most relevant to our current comparisons. We'll also include comparisons to simulations with 10 additional females harvested, but no further forecasts are generated here.  
+
+## Compare forecasted abundance
+Now we'll look at the distribution of projected population sizes under the three management alternatives (*status quo*, 5 additional females harvested, 10 additional females harvested) and ask where our estimates of female abundance in 2023 (138) and 2024 (166) fall in those distributions.  
+```{r compareDist}
+load("forc-h0.gzip")
+load("forc-h5.gzip")
+load("forc-h10.gzip")
+
+#Calculate median population size for each draw from the posterior
+# 2000 total draws, each simulated 100 times over a period of 50 years
+dim(forc.h0$Nbar)
+dim(forc.h5$Nbar)
+dim(forc.h10$Nbar)
+
+# ---
+#From Hooker et al. (2020) forecast.R script
+EN21.h0 <- apply(forc.h0$Nbar, c(1, 3), median)
+EN21.h5 <- apply(forc.h5$Nbar, c(1, 3), median)
+EN21.h10 <- apply(forc.h10$Nbar, c(1, 3), median)
+
+matplot(EN21.h0, type="l")
+matplot(EN21.h5, type="l")
+matplot(EN21.h10, type="l")
+
+quantile(EN21.h0[51,], c(0.025, 0.5, 0.975))
+quantile(EN21.h5[51,], c(0.025, 0.5, 0.975))
+quantile(EN21.h10[51,], c(0.025, 0.5, 0.975))
+## Years
+fyrs <- 2017:(2017+50)
+# ---
+```
+
+Now plot the full time series with our abundance estimates included...  
+```{r plotCasts}
+library(scales)
+
+#Load point estimates
+load("../scr/samples-bothSexes2.gzip")
+out <- coda::as.mcmc.list(samples)
+Nf23 <- unlist(out[,"Nf[1]"])
+Nf24 <- unlist(out[,"Nf[2]"])
+
+#First for status quo
+plot(fyrs, apply(EN21.h0, 1, median), type = "l", 
+     ylim = c(100,300), lwd = 2, col = "black",
+     xlab = "Year", ylab = "Female Abundance", main = "Status Quo")
+HPD50.h0 <- apply(EN21.h0, 1, quantile, prob = c(0.25, 0.75))
+HPD95.h0 <- apply(EN21.h0, 1, quantile, prob = c(0.025, 0.975))
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD50.h0[1,], HPD50.h0[2,][ncol(HPD50.h0):1]),
+    col = alpha("black", 0.25), border = NA)
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD95.h0[1,], HPD95.h0[2,][ncol(HPD95.h0):1]),
+    col = alpha("black", 0.1), border = NA)
+#Add points for estimates (and HPDI)
+points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2023, x1 = 2023, y0 = quantile(Nf23, 0.025), y1 = quantile(Nf23, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+points(x = 2024, y = median(Nf24), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2024, x1 = 2024, y0 = quantile(Nf24, 0.025), y1 = quantile(Nf24, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+
+#Then for 5 additional females per year
+plot(fyrs, apply(EN21.h5, 1, median), type = "l",
+     ylim = c(100,300), lwd = 2, col = "darkblue",
+     xlab = "Year", ylab = "Female Abundance", main = "+5 Females")
+HPD50.h5 <- apply(EN21.h5, 1, quantile, prob = c(0.25, 0.75))
+HPD95.h5 <- apply(EN21.h5, 1, quantile, prob = c(0.025, 0.975))
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD50.h5[1,], HPD50.h5[2,][ncol(HPD50.h5):1]),
+    col = alpha("darkblue", 0.25), border = NA)
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD95.h5[1,], HPD95.h5[2,][ncol(HPD95.h5):1]),
+    col = alpha("darkblue", 0.1), border = NA)
+#Add points for estimates (and HPDI)
+points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2023, x1 = 2023, y0 = quantile(Nf23, 0.025), y1 = quantile(Nf23, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+points(x = 2024, y = median(Nf24), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2024, x1 = 2024, y0 = quantile(Nf24, 0.025), y1 = quantile(Nf24, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+
+#Then for 10 additional females per year
+plot(fyrs, apply(EN21.h10, 1, median), type = "l",
+     ylim = c(100,300), lwd = 2, col = "darkred",
+     xlab = "Year", ylab = "Female Abundance", main = "+10 Females")
+HPD50.h10 <- apply(EN21.h10, 1, quantile, prob = c(0.25, 0.75))
+HPD95.h10 <- apply(EN21.h10, 1, quantile, prob = c(0.025, 0.975))
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD50.h10[1,], HPD50.h10[2,][ncol(HPD50.h10):1]),
+    col = alpha("darkred", 0.25), border = NA)
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD95.h10[1,], HPD95.h10[2,][ncol(HPD95.h10):1]),
+    col = alpha("darkred", 0.1), border = NA)
+#Add points for estimates (and HPDI)
+points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2023, x1 = 2023, y0 = quantile(Nf23, 0.025), y1 = quantile(Nf23, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+points(x = 2024, y = median(Nf24), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2024, x1 = 2024, y0 = quantile(Nf24, 0.025), y1 = quantile(Nf24, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+
+```
+
+Zooming in on the first part of the forecast...  
+```{r plotZoom}
+max.yr <- which(fyrs == 2030)
+fyrs <- fyrs[1:max.yr]
+EN21.h0 <- EN21.h0[1:max.yr,]
+EN21.h5 <- EN21.h5[1:max.yr,]
+EN21.h10 <- EN21.h10[1:max.yr,]
+
+#First for status quo
+plot(fyrs, apply(EN21.h0, 1, median), type = "l", 
+     ylim = c(100,300), lwd = 2, col = "black",
+     xlab = "Year", ylab = "Female Abundance", main = "Status Quo")
+HPD50.h0 <- apply(EN21.h0, 1, quantile, prob = c(0.25, 0.75))
+HPD95.h0 <- apply(EN21.h0, 1, quantile, prob = c(0.025, 0.975))
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD50.h0[1,], HPD50.h0[2,][ncol(HPD50.h0):1]),
+    col = alpha("black", 0.25), border = NA)
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD95.h0[1,], HPD95.h0[2,][ncol(HPD95.h0):1]),
+    col = alpha("black", 0.1), border = NA)
+#Add points for estimates (and HPDI)
+points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2023, x1 = 2023, y0 = quantile(Nf23, 0.025), y1 = quantile(Nf23, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+points(x = 2024, y = median(Nf24), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2024, x1 = 2024, y0 = quantile(Nf24, 0.025), y1 = quantile(Nf24, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+
+#Then for 5 additional females per year
+plot(fyrs, apply(EN21.h5, 1, median), type = "l",
+     ylim = c(100,300), lwd = 2, col = "darkblue",
+     xlab = "Year", ylab = "Female Abundance", main = "+5 Females")
+HPD50.h5 <- apply(EN21.h5, 1, quantile, prob = c(0.25, 0.75))
+HPD95.h5 <- apply(EN21.h5, 1, quantile, prob = c(0.025, 0.975))
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD50.h5[1,], HPD50.h5[2,][ncol(HPD50.h5):1]),
+    col = alpha("darkblue", 0.25), border = NA)
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD95.h5[1,], HPD95.h5[2,][ncol(HPD95.h5):1]),
+    col = alpha("darkblue", 0.1), border = NA)
+#Add points for estimates (and HPDI)
+points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2023, x1 = 2023, y0 = quantile(Nf23, 0.025), y1 = quantile(Nf23, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+points(x = 2024, y = median(Nf24), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2024, x1 = 2024, y0 = quantile(Nf24, 0.025), y1 = quantile(Nf24, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+
+#Then for 10 additional females per year
+plot(fyrs, apply(EN21.h10, 1, median), type = "l",
+     ylim = c(100,300), lwd = 2, col = "darkred",
+     xlab = "Year", ylab = "Female Abundance", main = "+10 Females")
+HPD50.h10 <- apply(EN21.h10, 1, quantile, prob = c(0.25, 0.75))
+HPD95.h10 <- apply(EN21.h10, 1, quantile, prob = c(0.025, 0.975))
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD50.h10[1,], HPD50.h10[2,][ncol(HPD50.h10):1]),
+    col = alpha("darkred", 0.25), border = NA)
+polygon(x=c(fyrs, fyrs[length(fyrs):1]),
+    y=c(HPD95.h10[1,], HPD95.h10[2,][ncol(HPD95.h10):1]),
+    col = alpha("darkred", 0.1), border = NA)
+#Add points for estimates (and HPDI)
+points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2023, x1 = 2023, y0 = quantile(Nf23, 0.025), y1 = quantile(Nf23, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+points(x = 2024, y = median(Nf24), pch = 19, cex = 0.75, col = "red")
+arrows(x0 = 2024, x1 = 2024, y0 = quantile(Nf24, 0.025), y1 = quantile(Nf24, 0.975), length = 0.05, angle = 90, code = 3, col = "red")
+```
+
+Finally, where do our point estimates fall in the distribution of simulations? In other words, what percentile is associated with the means of our posterior distributions for abundance?  
+```{r percCalcs}
+#Create ecdf for each year and scenario
+ecdf.h0.2023 <- ecdf(EN21.h0[which(fyrs == 2023),])
+ecdf.h0.2023(median(Nf23))
+ecdf.h0.2024 <- ecdf(EN21.h0[which(fyrs == 2024),])
+ecdf.h0.2024(median(Nf24))
+
+ecdf.h5.2023 <- ecdf(EN21.h5[which(fyrs == 2023),])
+ecdf.h5.2023(median(Nf23))
+ecdf.h5.2024 <- ecdf(EN21.h5[which(fyrs == 2024),])
+ecdf.h5.2024(median(Nf24))
+
+ecdf.h10.2023 <- ecdf(EN21.h10[which(fyrs == 2023),])
+ecdf.h10.2023(median(Nf23))
+ecdf.h10.2024 <- ecdf(EN21.h10[which(fyrs == 2024),])
+ecdf.h10.2024(median(Nf24))
+```
+
+In summary, our point estimates are consistent with predictions from the PVA in Hooker et al. (2020). The estimate for 2023 falls in the lower tail of the distributions of forecasted abundances under *status quo* management and with 5 additional females harvested per year, but is in the central 50th percentile interval with 10 additional females harvested per year. Meanwhile, the 2024 estimate falls in the central 50th percentile interval under all three scenarios.  
+
+---
+
