@@ -11,9 +11,9 @@ linkcolor: blue
 # Formatting Snare Locations
 Here, we will create spatial objects with information on the location of hair snares (*i.e.*, traps) associated with the project. There are several input files needed...
 
-1. `input/Hair Snare Summaries (Both Years).xlsx` - this is the actual Excel spreadsheet with information on landowners, locations, and weekly check dates for all hair snares in each of the two years of the project
-2. `input/HS23_coords.csv` - Pulling a few columns out of the file above - 2023 tab
-3. `input/HS24_coords.csv` - Pulling a few columns out of the file above - 2024 tab
+1. `input/Hair Snare Summaries (Both Years).xlsx` - an Excel spreadsheet with information on landowners, locations, and weekly check dates for all hair snares in each of the two years of the project
+2. `input/HS23_coords.csv` - pulling a few columns out of the file above - 2023 tab
+3. `input/HS24_coords.csv` - pulling a few columns out of the file above - 2024 tab
 
 The primary outputs will include...
 
@@ -22,7 +22,6 @@ The primary outputs will include...
     + `locs` - coordinates for all unique hair snares associated with the project (a $J \times 3$ data frame)
     + `oper` - operational status of each hair snare in each of the two years (a $J \times 2$ data frame)
 3. `translatable.csv` - a table with translation information for the naming of hair snares in the project
-4. `CGAsnarebuff` - a polygon shapefile defining a 4km buffer around the snare array (may not be used for SCR models)
 
 
 ## Load files
@@ -117,7 +116,7 @@ cnt
 ```
 
 ## Create `oper` and `traplocs`
-Now fill in the oper and traplocs objects that will be used for modeling.  
+Now fill in the `oper` and `traplocs` objects that will be used for modeling.  
 ```{r makeTraplocs}
 #Now fill in the contents of traplocs and oper
 for(j in 1:length(allnames)) {
@@ -154,7 +153,7 @@ sum(rownames(traplocs)[oper$Yr2024 == 1] %in% rownames(tmp24))
 ```
 
 ## Create `translatable`
-Now create a object that we can use to translate between the various names used for hair snares in the dataset.  
+Now create an object that we can use to translate between the various names used for hair snares in the dataset.  
 ```{r translatable}
 #Now create translatable
 translatable <- data.frame(UTMname=rep(NA, length(allnames)),
@@ -222,10 +221,8 @@ write.csv(translatable, "translatable.csv", quote=FALSE, row.names=FALSE)
 save(oper, locs, file="snareLocations.Rda")
 ```
 
-## Create `CGAsnarebuff`
-Now create a buffered polygon that surrounds the trapping array. This will be the state space for the analysis! 
-
-For now, we'll create a polygon with a **buffer of 4km**. Note that this was the size of the starting buffer in [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887).  
+## Visualize the snare locations
+Plot the traps and superimpose a 4km buffer (the size of the starting buffer in [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887)). This buffer will not be used as the state space for subsequent analyses, but it does serve to illustrate the potential locations of activity centers in relation to the hair snares used in the study.    
 ```{r makePoly}
 library(shapefiles)
 buffer <- 4000 #Buffer setting, in meters
@@ -268,6 +265,6 @@ plot(st_geometry(CGA), add=TRUE, lwd = 1.5)
 box(which="figure", lwd=1)
 ```
 
-So at this point we have our traplocs and oper objects (which will be used directly in the SCR model) and a `CGAsnarebuff` polygon that we can use to mask unsuitable habitat. Now we can move on to matching the samples back to the hair snares where they were collected!
+So at this point we have our `traplocs` and `oper` objects (which will be used directly in the SCR model). Now we can move on to matching the samples back to the hair snares where they were collected.  
 
 ---
