@@ -8,8 +8,10 @@ output:
 linkcolor: blue
 ---
 
-**ADD individual level filters for heterozygosity and missing data**.  
+**ADD individual level filters for heterozygosity (Fis < -0.5) and missing data (50% for LGC, 100 SNPs for GTS)**.  
 **ADD pID and pIDsibs calculations**.  
+**FIX NSNPGT - MAKE A NEW COLUMN FOR NSNPCOMBO OR SOMETHING - UPDATE COUNTS AFTER COMBINING THE DATASETS!!**
+**Look back at Leftovers script (in Desktop/SCRms_revs/) for useful code for pID, etc.**
 
 # Combining datasets for recapture analysis: LGC and GTSeek
 Some of the samples with DNA yields too low for capture-seq at Rapid Genomics were sent to GTSeek for genotyping-in-thousands by sequencing (GT-seq) genotyping ([Campbell et al. 2015](https://doi.org/10.1111/1755-0998.12357)) using a panel of markers  developed by Dana Morin at Mississippi State University. We want to combine the two datasets for recapture analyses that follow. To do so, there are several things we need to do here:
