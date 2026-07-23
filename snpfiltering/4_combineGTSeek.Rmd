@@ -8,6 +8,9 @@ output:
 linkcolor: blue
 ---
 
+**ADD individual level filters for heterozygosity and missing data**.  
+**ADD pID and pIDsibs calculations**.  
+
 # Combining datasets for recapture analysis: LGC and GTSeek
 Some of the samples with DNA yields too low for capture-seq at Rapid Genomics were sent to GTSeek for genotyping-in-thousands by sequencing (GT-seq) genotyping ([Campbell et al. 2015](https://doi.org/10.1111/1755-0998.12357)) using a panel of markers  developed by Dana Morin at Mississippi State University. We want to combine the two datasets for recapture analyses that follow. To do so, there are several things we need to do here:
 
@@ -21,7 +24,7 @@ Some of the samples with DNA yields too low for capture-seq at Rapid Genomics we
     + for GTSeek samples, this is handled by filters in step 3 above
     + for LGC samples, we require that all have genotypes for at least 100 of the SNPs in the dataset
 
-We'll walk through these steps below.  
+We'll walk through these steps below. At the end of the markdown, we include a short section evaluating the power of the marker set via calculation of probabilities of identity for random individuals ($p_{\text{ID}}$) and for siblings ($p_{\text{IDsibs}}$). These measure the chance that two unrelated individuals, or a pair of siblings, would share a genotype at all markers in the panel.  
 
 ## Compile metadata
 First, let's load the data and some files with information about the samples (which were submitted to GTSeek in four batches)...  
