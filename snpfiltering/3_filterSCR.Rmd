@@ -23,7 +23,7 @@ The basic steps involved in the filters below include:
 7. Avoiding linkage - prune markers based on LD within 500kb windows ($r^2$ < 0.8)
 
 
-After all of these filters, the file `LGC_SCR.vcf` will contain SNP genotypes for samples processed by LGC / Rapid Genomics. In the next step, we will combine these with a smaller number of loci genotyped via GT-seq (by GTSeek). We will come back to the raw VCF used here to extract genotypes for loci from the GT-seq panel that did not pass the filters used in creating `LGC_SCR.vcf` (due to minor allele frequencies, missing data levels, etc.). We will also apply individual-level filters for missingness and excessively high heterozygosity in the next step after creating the full, combined vcf file containing all samples and loci.  
+After all of these filters, the file `LGC_SCR.vcf` will contain SNP genotypes for samples processed by LGC / Rapid Genomics. In the next step, we will combine these with a smaller number of loci genotyped via GT-seq (by GTSeek). We will come back to the raw VCF used here to extract genotypes for loci from the GT-seq panel that did not pass the filters used in creating `LGC_SCR.vcf` (due to minor allele frequencies, missing data levels, etc.). We will also apply individual-level filters for missingness in the next step after creating the full, combined vcf file containing all samples and loci.  
 
 ## Step 0: Clean the raw VCF
 First, copy the files and create some summaries of average depth, per-individual missing data, and per-genotype depth.  
