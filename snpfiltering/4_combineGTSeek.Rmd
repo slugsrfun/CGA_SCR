@@ -576,7 +576,7 @@ freqs$pIDsib <- rep(NA, nrow(freqs))
 for(l in 1:nrow(freqs)) {
   freqs$pIDsib[l] <- 0.25 + (0.5*sum(c(freqs$FRQ[l]^2,(1-freqs$FRQ[l])^2))) +
                       (0.5*(sum(c(freqs$FRQ[l]^2, (1-freqs$FRQ[l])^2)))^2) - 
-                      (0.25*sum(c(freqs$FRQ[k]^4, (1-freqs$FRQ[l])^4)))
+                      (0.25*sum(c(freqs$FRQ[l]^4, (1-freqs$FRQ[l])^4)))
 }
 sum(log10(freqs$pIDsib))
 ```
