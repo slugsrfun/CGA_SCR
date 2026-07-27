@@ -8,6 +8,12 @@ output:
 linkcolor: blue
 ---
 
+**ADD PLOT COMPARING KINSHIP IN TECH REPS & ALL SAMPLES (SEE MS_REV)**
+**ADD FILTER FOR HIGH EXCESS HETEROZYGOSITY**
+**ADD REQUESTED DETAILS FOR TECHNICAL REPS**
+**LOOK BACK AT REVIEWS BEFORE FINALIZING THIS ONE**
+**DECIDE ON FILTERING STRATEGY AFTER THIS STEP**
+
 # Recapture Analysis: Combined
 In this markdown, we'll combine the results from `COLONY` and `PLINK2` to identify recaptures across the samples processed by RAPiD Genomics / LGC and GTSeek. We'll also estimate naive genotyping error rates, assess kinship coefficients between technical replicates, evaluate concordance in sex inferences from genotypic data, assign clone IDs for all samples, and assign final sexes for all unique genotypes. The outputs from this step will be used subsequently to create a capture history object for SCR modeling and to subsample to one sample per unique genotype for population genetic analyses.  
 
