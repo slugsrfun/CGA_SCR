@@ -586,7 +586,7 @@ We have exceptional power for individual identification with the full marker set
 ```{r subsamp_pID}
 subsize <- seq(from = 10, to = 200, by = 10)
 pIDsub <- matrix(data = NA, nrow = 100, ncol = length(subsize))
-PIDsibsub <- matrix(data = NA, nrow = 100, ncol = length(subsize))
+pIDsibsub <- matrix(data = NA, nrow = 100, ncol = length(subsize))
 
 for(size in 1:length(subsize)) {
   for(rep in 1:100) {
