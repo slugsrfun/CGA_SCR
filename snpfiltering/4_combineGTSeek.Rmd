@@ -592,33 +592,38 @@ for(size in 1:length(subsize)) {
   for(rep in 1:100) {
     tmp.set <- sample(c(1:nrow(freqs)), subsize[size], replace = FALSE)
     tmp.freq <- freqs[tmp.set,]
-    
-    pIDsub[rep, size] <- (freqs$FRQ[l]^4+(1-freqs$FRQ[l])^4) + 
-                          (2*freqs$FRQ[l]*(1-freqs$FRQ[l]))^2
-    pIDsibsub[rep, size] <-  0.25 + 
-                          (0.5*sum(c(freqs$FRQ[l]^2,(1-freqs$FRQ[l])^2))) +
-                          (0.5*(sum(c(freqs$FRQ[l]^2, (1-freqs$FRQ[l])^2)))^2) - 
-                          (0.25*sum(c(freqs$FRQ[l]^4, (1-freqs$FRQ[l])^4)))
-      
+    tmp.pID <- c()
+    tmp.pIDsib <- c()
+    for(l in 1:subsize[size]) {
+      tmp.pID[l] <- (tmp.freq$FRQ[l]^4+(1-tmp.freq$FRQ[l])^4) + 
+                      (2*tmp.freq$FRQ[l]*(1-tmp.freq$FRQ[l]))^2
+      pIDsub[rep,size] <- sum(log10(tmp.pID))
+      tmp.pIDsib[l] <-  0.25 + 
+                          (0.5*sum(c(tmp.freq$FRQ[l]^2,(1-tmp.freq$FRQ[l])^2))) +
+                          (0.5*(sum(c(tmp.freq$FRQ[l]^2, (1-tmp.freq$FRQ[l])^2)))^2) - 
+                          (0.25*sum(c(tmp.freq$FRQ[l]^4, (1-tmp.freq$FRQ[l])^4)))
+      pIDsibsub[rep,size] <- sum(log10(tmp.pIDsib))
+    }
+    rm(tmp.pID, tmp.pIDsib)
+    rm(tmp.set, tmp.freq)
   }
 }
 
 
 #Plot the results
 library(scales)
-plot(subsize, colMeans(log10(pIDsub)), type = "l", 
-     ylim = range(log10(pIDsub)), lwd = 2, col = "black", 
+plot(subsize, colMeans(pIDsub), type = "l", 
+     ylim = range(pIDsub), lwd = 2, col = "black", 
      xlab = "Number of SNP loci", ylab = "Probability of Identity")
-quant95 <- apply(log10(pIDsub), 1, quantile, prob = c(0.025, 0.975))
+quant95 <- apply(pIDsub, 2, quantile, prob = c(0.025, 0.975))
 polygon(x = c(subsize, subsize[length(subsize):1]),
         y=c(quant95[1,], quant95[2,][ncol(quant95):1]),
         col=alpha("black", 0.1), border = NA)
 
-library(scales)
-plot(subsize, colMeans(log10(pIDsibsub)), type = "l", 
-     ylim = range(log10(pIDsibsub)), lwd = 2, col = "black", 
+plot(subsize, colMeans(pIDsibsub), type = "l", 
+     ylim = range(pIDsibsub), lwd = 2, col = "black", 
      xlab = "Number of SNP loci", ylab = "Probability of Identity - Siblings")
-quant95 <- apply(log10(pIDsibsub), 1, quantile, prob = c(0.025, 0.975))
+quant95 <- apply(pIDsibsub, 2, quantile, prob = c(0.025, 0.975))
 polygon(x = c(subsize, subsize[length(subsize):1]),
         y=c(quant95[1,], quant95[2,][ncol(quant95):1]),
         col=alpha("black", 0.1), border = NA)
