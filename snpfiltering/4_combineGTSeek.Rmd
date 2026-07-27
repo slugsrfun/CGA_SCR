@@ -556,7 +556,7 @@ vcftools --vcf finalSCR.recode.vcf --out finalSCR \
 
 Now use these to calculate $p_{\text{ID}}$.  
 ```{r pID}
-freqs <- read.table("finalSCR.afreq", header = FALSE)
+freqs <- read.table("finalSCR.frq", header = FALSE)
 colnames(freqs) <- c("CHROM", "CPOS", "REF", "ALT", "FRQ", "NCHR")
 freqs$pID <- rep(NA, nrow(freqs))
 for(l in 1:nrow(freqs)) {
