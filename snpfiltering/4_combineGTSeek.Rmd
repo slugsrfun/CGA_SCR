@@ -8,11 +8,6 @@ output:
 linkcolor: blue
 ---
 
-**ADD individual level filters for heterozygosity (Fis < -0.5) and missing data (50% for LGC, 100 SNPs for GTS)**.  
-**ADD pID and pIDsibs calculations**.  
-**FIX NSNPGT - MAKE A NEW COLUMN FOR NSNPCOMBO OR SOMETHING - UPDATE COUNTS AFTER COMBINING THE DATASETS!!**
-**Look back at Leftovers script (in Desktop/SCRms_revs/) for useful code for pID, etc.**
-
 # Combining datasets for recapture analysis: LGC and GTSeek
 Some of the samples with DNA yields too low for capture-seq at Rapid Genomics were sent to GTSeek for genotyping-in-thousands by sequencing (GT-seq) genotyping ([Campbell et al. 2015](https://doi.org/10.1111/1755-0998.12357)) using a panel of markers  developed by Dana Morin at Mississippi State University. We want to combine the two datasets for recapture analyses that follow. To do so, there are several things we need to do here:
 
@@ -23,10 +18,10 @@ Some of the samples with DNA yields too low for capture-seq at Rapid Genomics we
 4. combine the two datasets
 5. record the number of SNPs genotyped for all samples in our `sampleMetadata` file
 6. drop samples that are not sufficiently genotyped prior to recapture analyses
-    + for GTSeek samples, this is handled by filters in step 3 above
-    + for LGC samples, we require that all have genotypes for at least 100 of the SNPs in the dataset
+    + for GTSeek samples, at least 100 SNPs genotyped
+    + for LGC samples, <50% missing data (in the combined dataset)
 
-We'll walk through these steps below. At the end of the markdown, we include a short section evaluating the power of the marker set via calculation of probabilities of identity for random individuals ($p_{\text{ID}}$) and for siblings ($p_{\text{IDsibs}}$). These measure the chance that two unrelated individuals, or a pair of siblings, would share a genotype at all markers in the panel.  
+We'll walk through these steps below. At the end of the markdown, we include a short section evaluating the power of the marker set via calculation of probabilities of identity for random individuals ($p_{\text{ID}}$) and for siblings ($p_{\text{IDsib}}$). These measure the chance that two unrelated individuals, or a pair of siblings, would share identical genotypes.  
 
 ## Compile metadata
 First, let's load the data and some files with information about the samples (which were submitted to GTSeek in four batches)...  
@@ -172,7 +167,7 @@ gt.smd[1:10,]
 ```
 
 ## Extract SNPs
-Now we'll use the column names of the `gt` object to create a list of SNPs to extract from our raw vcf file (from LGC) using the `--positions` argument to `vcftools`. In other words, add the loci genotyped by GTSeek to the set of markers that we're using for individual identification. Note that some of these SNPs will not have a minor allele frequency higher than the filter applied in `3_filterSCR`. We will retain them nonetheless to avoid too much missing data for samples processed via GTSeek.  
+Now we'll use the column names of the `gt` object to create a list of SNPs to extract from our raw vcf file (from LGC) using the `--positions` argument to `vcftools`. In other words, add the loci genotyped by GTSeek to the set of markers that we're using for individual identification. Note that some of these SNPs will not have a minor allele frequency below the filter applied in `3_filterSCR`. We will retain them nonetheless to avoid too much missing data for samples processed via GTSeek.  
 ```{r getSNPnames}
 #Column names, avoiding info columns, sexing loci columns, and the ugaID column
 gtsSNPs <- colnames(gt)[-c(1:6,grep("Uam",colnames(gt)),ncol(gt))]
@@ -334,10 +329,10 @@ plot(comp.rep$error ~ comp.rep$ogIFI,
 So the IFI is very similar between the two technical replicates, and it does seem to be predictive of mismatches between the replicates. This should be useful for identifying poorly genotyped samples that should be removed from the dataset.  
 
 ## Individual filtering
-It seems reasonable to remove samples for either of two reasons, i) low rate of genotyping or ii) high IFI. In their paper describing GT-seq, [Campbell et al. (2015)](https://doi.org/10.1111/1755-0998.12357) considered samples that were genotyped at less than 50% of SNPs as failed samples. We'll follow their lead below...  
+It seems reasonable to remove samples for either of two reasons, i) low rate of genotyping or ii) high IFI. In their paper describing GT-seq, [Campbell et al. (2015)](https://doi.org/10.1111/1755-0998.12357) considered samples that were genotyped at less than 50% of SNPs as failed samples. We'll apply a more stringent filter for retaining samples below. For now, drop samples due to high IFI only...  
 ```{r GTseqFilt}
-#Identify samples that fail either filter
-drop.me <- which(gt$IFI > 2 | gt$X.GT < 0.5)
+#Identify samples with high IFI
+drop.me <- which(gt$IFI > 2)
 length(drop.me)
 
 #Now remove from genotype and metadata
@@ -403,7 +398,6 @@ sum(apply(vcfFormat, 1, FUN=function(x) length(unique(x))) > 1)
 colnames(vcfFormat) <- paste0("GTS_",gt.smd$ugaID[-drop.me])
 dim(vcfFormat)
 
-#Then write to a file
 write.table(vcfFormat, sep = "\t", file = "extraCols.vcf", 
             quote = FALSE, row.names = FALSE, col.names = TRUE)
 ```
@@ -431,6 +425,19 @@ Now read this file into R and identify sites that have exactly two alleles in th
 snpfreq <- read.table("fullout.frq", skip = 1, fill=TRUE)
 colnames(snpfreq)[3] <- "N_ALLELES" 
 biallelic <- snpfreq[which(snpfreq$N_ALLELES == 2),c(1,2)]
+
+fixed.sites <- c(grep(":1", biallelic$A1), 
+                 grep(":1", biallelic$A2), 
+                 grep(":1", biallelic$A3))
+fixed.sites
+biallelic[fixed.sites,]
+
+if(length(fixed.sites) > 0) {
+  biallelic <- biallelic[-fixed.sites,c(1,2)]
+}
+
+nrow(biallelic)
+
 write.table(biallelic, file = "biallelic.txt",
             quote = FALSE, row.names = FALSE, col.names = FALSE)
 ```
@@ -442,11 +449,10 @@ vcftools --vcf fullout.vcf --out prefinal \
         --remove-filtered-all --recode
 ```
 
-
 This all worked, so we should be in good shape for downstream analyses with this file!  
 
 ## Individual-level filter (missingness)
-Lastly, we want to check to see how many SNPs are genotyped for each individual in the dataset and combine our metadata files into a version with both LGC and GTSeek samples! We also want to remove samples that are genotyped at fewer than 50 (GTSeek) to 100 (LGC) SNPs across the dataset. We are unlikley to be able to confidently identify these samples.  
+Lastly, we want to check to see how many SNPs are genotyped for each individual in the dataset and combine our metadata files into a version with both LGC and GTSeek samples! We also want to remove samples that are genotyped at fewer than 100 SNPs (GTSeek) or <50% of the SNPs in the combined dataset (LGC).  
 ```{r metadata_update}
 #Get missing data information for each individual
 system("vcftools --vcf prefinal.recode.vcf --out prefinal --missing-indv")
@@ -463,18 +469,30 @@ smd <- rbind(lgc.smd, gt.smd)
 smd$vcfID <- c(lgc.smd$extID,
                paste0("GTS_",gt.smd$ugaID))
 smd$FILT <- NA
+
+#Update nSNPgt for all samples
 for(i in 1:nrow(smd)) {
   tmp <- which(missSNPs$INDV == smd$vcfID[i])
   if(length(tmp) > 0) {
     smd$nSNPgt[i] <- missSNPs$N_DATA[tmp]-missSNPs$N_MISS[tmp]
+  } 
+}
+
+#Set the thresholds
+GTS_thresh <- 100
+LGC_thresh <- missSNPs$N_DATA[1]*0.5
+
+for(i in 1:nrow(smd)) {
+  tmp <- which(missSNPs$INDV == smd$vcfID[i])
+  if(length(tmp) > 0) {
     if(length(grep("GTS_",smd$vcfID[i])) > 0) {
-      if(smd$nSNPgt[i] < 50) {
+      if(smd$nSNPgt[i] < GTS_thresh) {
         smd$FILT[i] <- TRUE
       } else {
         smd$FILT[i] <- FALSE
       }
     } else if(length(grep("UGA_",smd$vcfID[i])) > 0) {
-      if(smd$nSNPgt[i] < 100) {
+      if(smd$nSNPgt[i] < LGC_thresh) {
         smd$FILT[i] <- TRUE
       } else {
         smd$FILT[i] <- FALSE
@@ -490,14 +508,14 @@ for(i in 1:nrow(smd)) {
 sum(smd$FILT)
 #Number NOT removed
 sum(!smd$FILT)
-#Number of GTSeek samples with 50+ SNPs genotyped
-sum(smd$nSNPgt[grep("GTS_", smd$vcfID)] >= 50, na.rm = TRUE)
+#Number of GTSeek samples retained
+sum(smd$nSNPgt[grep("GTS_", smd$vcfID)] >= GTS_thresh, na.rm = TRUE)
 #Number of LGC samples with 100+ SNPs genotyped
-sum(smd$nSNPgt[grep("UGA_", smd$vcfID)] >= 100, na.rm = TRUE)
+sum(smd$nSNPgt[grep("UGA_", smd$vcfID)] >= LGC_thresh, na.rm = TRUE)
 
 #These should match
-sum(!smd$FILT) == sum(smd$nSNPgt[grep("GTS_", smd$vcfID)] >= 50, na.rm = TRUE) +
-  sum(smd$nSNPgt[grep("UGA_", smd$vcfID)] >= 100, na.rm = TRUE)
+sum(!smd$FILT) == sum(smd$nSNPgt[grep("GTS_", smd$vcfID)] >= GTS_thresh, na.rm = TRUE) +
+  sum(smd$nSNPgt[grep("UGA_", smd$vcfID)] >= LGC_thresh, na.rm = TRUE)
 
 #Number of SNPs genotyped per sample
 smd$nSNPgt[which(smd$FILT == FALSE)]
@@ -505,7 +523,7 @@ smd$nSNPgt[which(smd$FILT == FALSE)]
 #Write metadata file
 write.csv(smd, "sampleMetadata_combined.csv", quote = FALSE, row.names=FALSE)
 
-#Keep individuals with mroe than 50 SNPs genotyped...
+#Keep individuals that are not filtered from the dataset
 keeplist <- smd$vcfID[which(smd$FILT == FALSE)]
 
 #Write keeplist to a text file
@@ -521,9 +539,93 @@ vcftools --vcf prefinal.recode.vcf --out finalSCR \
           --keep keeperInds.txt --recode
 ```
 
+## Evaluate Power of the Set
+We can use the allele frequencies above to calculate $p_{ID}$ for the marker set (and for random subsets of the SNP data to give us an idea of how many markers we need to successfully genotype to keep an individual in the dataset).  
+
+Here we're using the simple equation from [Waits et al. (2001)](https://doi.org/10.1046/j.1365-294X.2001.01185.x).  
+For one locus with two alleles:  
+$$p_{\text{ID}}=\sum(p_i^4)+(2p_ip_j)^2$$
+
+Then the power of the combined marker set is the product of $p_{\text{ID}}$ across all SNP loci, as markers are assumed to provide independent information on identity.  
+
+First, extract allele frequencies for all loci in the combined dataset.  
+```{r engine="bash", comment=""}
+vcftools --vcf finalSCR.recode.vcf --out finalSCR \
+          --freq
+```
+
+Now use these to calculate $p_{\text{ID}}$.  
+```{r pID}
+freqs <- read.table("finalSCR.afreq", header = FALSE)
+colnames(freqs) <- c("CHROM", "CPOS", "REF", "ALT", "FRQ", "NCHR")
+freqs$pID <- rep(NA, nrow(freqs))
+for(l in 1:nrow(freqs)) {
+  freqs$pID[l] <- (freqs$FRQ[l]^4+(1-freqs$FRQ[l])^4) + 
+                    (2*freqs$FRQ[l]*(1-freqs$FRQ[l]))^2
+}
+sum(log10(freqs$pID))
+```
+
+A more conservative estimate of the power of the set is provided by $p_{\text{IDsib}}$, which measures the same probability for siblings. Also from [Waits et al. (2001)](https://doi.org/10.1046/j.1365-294X.2001.01185.x)...  
+
+$$p_{\text{IDsib}} = 0.25 + \left( 0.5 \sum p_i^2\right)+ \left [ 0.5 \left( \sum p_i^2\right)^2 \right ] - \left( 0.25 \sum p_i^4\right)$$
+
+As above, the $p_{\text{IDsib}}$ for the dataset is the product across loci.  
+```{r pIDsib}
+freqs$pIDsib <- rep(NA, nrow(freqs))
+for(l in 1:nrow(freqs)) {
+  freqs$pIDsib[l] <- 0.25 + (0.5*sum(c(freqs$FRQ[l]^2,(1-freqs$FRQ[l])^2))) +
+                      (0.5*(sum(c(freqs$FRQ[l]^2, (1-freqs$FRQ[l])^2)))^2) - 
+                      (0.25*sum(c(freqs$FRQ[k]^4, (1-freqs$FRQ[l])^4)))
+}
+sum(log10(freqs$pIDsib))
+```
+
+### Power with subsets of the panel?
+We have exceptional power for individual identification with the full marker set. However, few if any samples will be genotyped at all loci. Here we recalculate the probabilities above with random samples from the full panel (between 10 and 200 SNPs).  
+```{r subsamp_pID}
+subsize <- seq(from = 10, to = 200, by = 10)
+pIDsub <- matrix(data = NA, nrow = 100, ncol = length(subsize))
+PIDsibsub <- matrix(data = NA, nrow = 100, ncol = length(subsize))
+
+for(size in 1:length(subsize)) {
+  for(rep in 1:100) {
+    tmp.set <- sample(c(1:nrow(freqs)), subsize[size], replace = FALSE)
+    tmp.freq <- freqs[tmp.set,]
+    
+    pIDsub[rep, size] <- (freqs$FRQ[l]^4+(1-freqs$FRQ[l])^4) + 
+                          (2*freqs$FRQ[l]*(1-freqs$FRQ[l]))^2
+    pIDsibsub[rep, size] <-  0.25 + 
+                          (0.5*sum(c(freqs$FRQ[l]^2,(1-freqs$FRQ[l])^2))) +
+                          (0.5*(sum(c(freqs$FRQ[l]^2, (1-freqs$FRQ[l])^2)))^2) - 
+                          (0.25*sum(c(freqs$FRQ[k]^4, (1-freqs$FRQ[l])^4)))
+      
+  }
+}
+
+
+#Plot the results
+library(scales)
+plot(subsize, colMeans(log10(pIDsub)), type = "l", 
+     ylim = range(log10(pIDsub)), lwd = 2, col = "black", 
+     xlab = "Number of SNP loci", ylab = "Probability of Identity")
+quant95 <- apply(log10(pIDsub), 1, quantile, prob = c(0.025, 0.975))
+polygon(x = c(subsize, subsize[length(subsize):1]),
+        y=c(quant95[1,], quant95[2,][ncol(quant95):1]),
+        col=alpha("black", 0.1), border = NA)
+
+library(scales)
+plot(subsize, colMeans(log10(pIDsibsub)), type = "l", 
+     ylim = range(log10(pIDsibsub)), lwd = 2, col = "black", 
+     xlab = "Number of SNP loci", ylab = "Probability of Identity - Siblings")
+quant95 <- apply(log10(pIDsibsub), 1, quantile, prob = c(0.025, 0.975))
+polygon(x = c(subsize, subsize[length(subsize):1]),
+        y=c(quant95[1,], quant95[2,][ncol(quant95):1]),
+        col=alpha("black", 0.1), border = NA)
+```
 
 ## Test file
-As a quick test, we'll attempt to use this file with `PLINK` and `vcftools`...  
+As a final test, we'll attempt to use this file with `PLINK` and `vcftools`...  
 ```{r engine="bash", comment=""}
 #Attempt to calculate pairwise kinship coefficients in plink2
 plink2 --vcf finalSCR.recode.vcf --make-king-table \
