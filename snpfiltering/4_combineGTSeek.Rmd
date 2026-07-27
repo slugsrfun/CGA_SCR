@@ -550,13 +550,13 @@ Then the power of the combined marker set is the product of $p_{\text{ID}}$ acro
 
 First, extract allele frequencies for all loci in the combined dataset.  
 ```{r engine="bash", comment=""}
-vcftools --vcf finalSCR.recode.vcf --out finalSCR \
-          --freq
+#Extract allele frequencies for these SNPs to calculate p_{ID}
+plink2 --vcf finalSCR.recode.vcf --allow-extra-chr --freq --out finalSCR --silent
 ```
 
 Now use these to calculate $p_{\text{ID}}$.  
 ```{r pID}
-freqs <- read.table("finalSCR.frq", header = FALSE)
+freqs <- read.table("finalSCR.afreq", header = FALSE)
 colnames(freqs) <- c("CHROM", "CPOS", "REF", "ALT", "FRQ", "NCHR")
 freqs$pID <- rep(NA, nrow(freqs))
 for(l in 1:nrow(freqs)) {
