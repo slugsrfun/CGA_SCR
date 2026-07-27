@@ -598,7 +598,7 @@ for(size in 1:length(subsize)) {
     pIDsibsub[rep, size] <-  0.25 + 
                           (0.5*sum(c(freqs$FRQ[l]^2,(1-freqs$FRQ[l])^2))) +
                           (0.5*(sum(c(freqs$FRQ[l]^2, (1-freqs$FRQ[l])^2)))^2) - 
-                          (0.25*sum(c(freqs$FRQ[k]^4, (1-freqs$FRQ[l])^4)))
+                          (0.25*sum(c(freqs$FRQ[l]^4, (1-freqs$FRQ[l])^4)))
       
   }
 }
