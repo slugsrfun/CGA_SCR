@@ -8,6 +8,8 @@ output:
 linkcolor: blue
 ---
 
+**ADD COMPARISON OF DISTANCES WITHIN AND BETWEEN YEARS - JUSTIFY STATIC AC**
+
 # Mapping Genotype Recaptures in Central GA
 This markdown will visualize the spatial distribution of bears with *spatial recaptures* from hair samples collected in central Georgia (2023 and 2024). These samples were genotyped via capture-seq (Rapid Genomics) or GT-seq (GTSeek). Capture-seq data were filtered to avoid tightly linked loci (no SNPs within 500kb with $r^2 > 0.8$) and focus on informative markers (MAF > 0.2) and combined with GT-seq data (which have a broader range of MAF), resulting in a total of 1325 SNP loci (see `4_combineGTSeek` for details on combining the data from the two marker panels). Genotypes were subjected to a clone analysis in `COLONY` ([Wang 2016](https://doi.org/10.1111/1755-0998.12452)) and KING kinship coefficients ([Manichaikul et al. 2010](https://doi.org/10.1093/bioinformatics/btq559)) were calculated in [`PLINK2`](https://www.cog-genomics.org/plink/2.0/) ([Chang et al. 2015](https://doi.org/10.1186/s13742-015-0047-8)). Inferences from the two approaches were combined following methods outlined in `10_recapFinal`.  
 
