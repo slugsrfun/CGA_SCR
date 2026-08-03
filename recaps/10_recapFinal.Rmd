@@ -187,15 +187,6 @@ repl.out[which(repl.out$is.cloneCOLONY == FALSE &
 
 ```
 
-The interesting portions of the table comparing technical replicates...  
-\tiny
-```{r repl.out}
-repl.out[,c("ugaID","nSNPgt1","nSNPgt2","filt1","filt2","nSNPshared",
-            "nSNPmatch","kinship","mismatch","errorRate")]
-```
-
-\normalsize
-
 So all `COLONY` matches in this set are confirmed by `PLINK`, but `PLINK` finds a handful of matches that COLONY does not. Obviously, all (or almost all) of the matches in this set are real. These come from duplicated samples. It's somewhat worrisome that `COLONY` does not match pairs of samples with matching genotypes at 117 of 117 and 122 of 122 mutually genotyped loci (see the comparisons above). It's less surprising that COLONY doesn't match the `227-23` sample, given the number of genotype mismatches there. Note that `PLINK` *does* recover the former two sample pairs (`151-24` and `935-23`) as matches, so the combined approach we're using would classify them as members of the same clone!  
 
 With the mismatches we see for `227-23` and `35-SGA`, it seems best to exclude those samples from the dataset.  
@@ -229,6 +220,15 @@ mean(repl.out$errorRate[which(repl.out$is.cloneCOLONY==TRUE &
 ```
 
 Error rates are 2-3% for the capture-seq (LGC) dataset, but substantially lower for GT-seq (GTSeek) data.  
+
+The interesting portions of the table comparing technical replicates...  
+\tiny
+```{r repl.out}
+repl.out[,c("ugaID","nSNPgt1","nSNPgt2","filt1","filt2","nSNPshared",
+            "nSNPmatch","kinship","mismatch","errorRate")]
+```
+
+\normalsize
 
 ### Kinship?
 The range of kinship coefficients for (good) technical replicates will be used below as a threshold for combining `COLONY` and `PLINK` inferences. Let's calculate that now.  
@@ -1089,7 +1089,7 @@ write.table(keepersCGA, "keeperClonesCGA.txt",
 
 Now calculate $F_{IS}$ for these individuals...  
 ```{r engine="bash", comment = ""}
-vcftools --vcf ../snpfilteringfinalSCR.recode.vcf \
+vcftools --vcf ../snpfiltering/finalSCR.recode.vcf \
           --keep keeperClonesCGA.txt --out CGA_Fcheck --het
 ```
 
