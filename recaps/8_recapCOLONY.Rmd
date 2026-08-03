@@ -9,7 +9,7 @@ linkcolor: blue
 ---
 
 # Recapture Analysis in `COLONY`
-The `COLONY` job ran successfully in ~10 hours (using the parallel `COLONY` executable with 8 cores). Note that this analysis is faster when using the monogamous mating model, which [Wang (2016)](https://doi.org/10.1111/1755-0998.12452) recommends. This way, only full-sib groups are identified at first. It is unlikely that pairs of samples identified as half-sibs would actually be recaptures. While this is fine for the clone analysis in `COLONY`, it would not be appropriate for an analysis intended to reconstruct the pedigree of the sample or estimate $N_b$ using the sibship method implemented in `COLONY`. Those analyses would require the polygamous mating model.  
+The `COLONY` job ran successfully in ~5 hours (using the parallel `COLONY` executable with 8 cores). Note that this analysis is faster when using the monogamous mating model, which [Wang (2016)](https://doi.org/10.1111/1755-0998.12452) recommends. This way, only full-sib groups are identified at first. It is unlikely that pairs of samples identified as half-sibs would actually be recaptures. While this is fine for the clone analysis in `COLONY`, it would not be appropriate for an analysis intended to reconstruct the pedigree of the sample or estimate $N_b$ using the sibship method implemented in `COLONY`. Those analyses would require the polygamous mating model.  
 
 In this markdown, we read in the outputs from `COLONY` and calculate a few basic summaries...  
 ```{r readCOLout}
