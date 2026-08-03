@@ -8,14 +8,10 @@ output:
 linkcolor: blue
 ---
 
-**ADD PLOT COMPARING KINSHIP IN TECH REPS & ALL SAMPLES (SEE MS_REV)**
-**ADD FILTER FOR HIGH EXCESS HETEROZYGOSITY**
-**ADD REQUESTED DETAILS FOR TECHNICAL REPS**
-**LOOK BACK AT REVIEWS BEFORE FINALIZING THIS ONE**
-**DECIDE ON FILTERING STRATEGY AFTER THIS STEP**
-
 # Recapture Analysis: Combined
-In this markdown, we'll combine the results from `COLONY` and `PLINK2` to identify recaptures across the samples processed by RAPiD Genomics / LGC and GTSeek. We'll also estimate naive genotyping error rates, assess kinship coefficients between technical replicates, evaluate concordance in sex inferences from genotypic data, assign clone IDs for all samples, and assign final sexes for all unique genotypes. The outputs from this step will be used subsequently to create a capture history object for SCR modeling and to subsample to one sample per unique genotype for population genetic analyses.  
+In this markdown, we'll combine the results from `COLONY` and `PLINK2` to identify recaptures across the samples processed by RAPiD Genomics / LGC and GTSeek. We'll also estimate naive genotyping error rates, assess kinship coefficients between technical replicates, evaluate concordance in sex inferences from genotypic data, assign clone IDs for all samples, and assign final sexes for all unique genotypes. We also incorporate one additional filter in this markdown, removing individuals with excessively high heterozygosity (*i.e.*, $F_{IS} < -0.5$), which may be indicative of sample contamination.  
+
+The outputs from this step will be used subsequently to create a capture history object for SCR modeling and to subsample to one sample per unique genotype for population genetic analyses.  
 
 The strategy used to combine inferences from `COLONY` and `PLINK2` is as follows:
 
@@ -191,6 +187,15 @@ repl.out[which(repl.out$is.cloneCOLONY == FALSE &
 
 ```
 
+The interesting portions of the table comparing technical replicates...  
+\tiny
+```{r repl.out}
+repl.out[,c("ugaID","nSNPgt1","nSNPgt2","filt1","filt2","nSNPshared",
+            "nSNPmatch","kinship","mismatch","errorRate")]
+```
+
+\normalsize
+
 So all `COLONY` matches in this set are confirmed by `PLINK`, but `PLINK` finds a handful of matches that COLONY does not. Obviously, all (or almost all) of the matches in this set are real. These come from duplicated samples. It's somewhat worrisome that `COLONY` does not match pairs of samples with matching genotypes at 117 of 117 and 122 of 122 mutually genotyped loci (see the comparisons above). It's less surprising that COLONY doesn't match the `227-23` sample, given the number of genotype mismatches there. Note that `PLINK` *does* recover the former two sample pairs (`151-24` and `935-23`) as matches, so the combined approach we're using would classify them as members of the same clone!  
 
 With the mismatches we see for `227-23` and `35-SGA`, it seems best to exclude those samples from the dataset.  
@@ -206,24 +211,24 @@ range(repl.out$errorRate, na.rm = TRUE)
 
 #Naive estimate of genotyping error rate is the average proportion of mismatches?
 mean(repl.out$errorRate, na.rm = TRUE)
-# 1.98% including all samples
+# 1.73% including all samples
 mean(repl.out$errorRate[which(repl.out$GTservice == "LGC")], na.rm=TRUE)
-# 3.36% for LGC samples
+# 2.94% for LGC samples
 mean(repl.out$errorRate[which(repl.out$GTservice == "GTSeek")], na.rm = TRUE)
 # < 0.1% for GTSeek
 
 #Excluding samples that are suspicious (where COLONY doesn't find a match)
 mean(repl.out$errorRate[which(repl.out$is.cloneCOLONY==TRUE)])
-# 1.2% with only "good" pairs
+# 0.94% with only "good" pairs
 mean(repl.out$errorRate[which(repl.out$is.cloneCOLONY==TRUE & 
                                 repl.out$GTservice == "LGC")])
-# 2.0% for LGC matching samples
+# 1.6% for LGC matching samples
 mean(repl.out$errorRate[which(repl.out$is.cloneCOLONY==TRUE & 
                                 repl.out$GTservice == "GTSeek")])
 # again <0.1% for GTSeek
 ```
 
-Error rates are ~2% for the capture-seq (LGC) dataset, but substantially lower for GT-seq (GTSeek) data.  
+Error rates are 2-3% for the capture-seq (LGC) dataset, but substantially lower for GT-seq (GTSeek) data.  
 
 ### Kinship?
 The range of kinship coefficients for (good) technical replicates will be used below as a threshold for combining `COLONY` and `PLINK` inferences. Let's calculate that now.  
@@ -300,32 +305,32 @@ max(nSexGT)
 which(nSexGT > 1)
 
 #They do in a few cases...
-# 14 31 47 292 307
+# 14 30 45 238 255
 
-#Clone 14 - 33 samples, 29 female, 2 male, 2 undet - no direct capture to confirm majority
+#Clone 14 - 30 samples, 26 female, 2 male, 2 undet - no direct capture to confirm majority
 table(smd$sexGT[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 14,3], ",")[[1]]])
 smd[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 14,3], ",")[[1]],]
 smd$knownSEX[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 14,3], ",")[[1]]]
 
-#Clone 31 - 6 samples, 5 female, 1 male - direct capture confirms majority
-table(smd$sexGT[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 31,3], ",")[[1]]])
-smd[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 31,3], ",")[[1]],]
-smd$knownSEX[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 31,3], ",")[[1]]]
+#Clone 30 - 6 samples, 5 female, 1 male - direct capture confirms majority
+table(smd$sexGT[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 30,3], ",")[[1]]])
+smd[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 30,3], ",")[[1]],]
+smd$knownSEX[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 30,3], ",")[[1]]]
 
-#Clone 47 - 6 samples, 5 female, 1 male - direct capture confirms majority
-table(smd$sexGT[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 47,3], ",")[[1]]])
-smd[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 47,3], ",")[[1]],]
-smd$knownSEX[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 47,3], ",")[[1]]]
+#Clone 45 - 6 samples, 5 female, 1 male - direct capture confirms majority
+table(smd$sexGT[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 45,3], ",")[[1]]])
+smd[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 45,3], ",")[[1]],]
+smd$knownSEX[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 45,3], ",")[[1]]]
 
-#Clone 292 - 9 samples, 8 male, 1 female - no direct capture to confirm majority
-table(smd$sexGT[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 292,3], ",")[[1]]])
-smd[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 292,3], ",")[[1]],]
-smd$knownSEX[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 292,3], ",")[[1]]]
+#Clone 238 - 9 samples, 8 male, 1 female - no direct capture to confirm majority
+table(smd$sexGT[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 238,3], ",")[[1]]])
+smd[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 238,3], ",")[[1]],]
+smd$knownSEX[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 238,3], ",")[[1]]]
 
-#Clone 307 - 28 samples, 25 male, 1 female, 2 undet - no direct capture to confirm majority
-table(smd$sexGT[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 307,3], ",")[[1]]])
-smd[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 307,3], ",")[[1]],]
-smd$knownSEX[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 307,3], ",")[[1]]]
+#Clone 255 - 28 samples, 25 male, 1 female, 2 undet - no direct capture to confirm majority
+table(smd$sexGT[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 255,3], ",")[[1]]])
+smd[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 255,3], ",")[[1]],]
+smd$knownSEX[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex == 255,3], ",")[[1]]]
 ```
 
 So sex is not inferred perfectly. That's not surprising, given the pretty lenient threshold we're using to identify males (just 5 reads required at 2 SNPs within 3 Y-specific scaffolds). Contamination could easily lead to us calling a sample a male erroneously. Nonetheless, instances with multiple sexes are relatively rare, and in all cases there is either a clear majority from the set of samples or a direct capture that confirms the consensus from the set.  
@@ -339,10 +344,7 @@ which(nRegion > 1)
 smd$region[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex==3,3],",")[[1]]]
 #Not really a separate region, just a historic hair sample (from 2012)
 
-smd$region[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex==63,3],",")[[1]]]
-#Not really a separate region, just a historic hair sample (from 2012)
-
-smd$region[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex==332,3],",")[[1]]]
+smd$region[smd$vcfID %in% strsplit(col.out[col.out$CloneIndex==282,3],",")[[1]]]
 #Not really a separate region, just a historic hair sample (from 2012)
 ```
 
@@ -379,12 +381,12 @@ sum(multknown, na.rm = TRUE) #0 cases with multiple "known" sexes
 
 #Check the discrepancies...
 which(discrepancy == TRUE)
-#Clone 31 - seen above, capture agrees with majority of samples
-smd[smd$vcfID %in% strsplit(col.out[which(col.out$CloneIndex == 31),3],",")[[1]],]
-#Clone 47 - seen above, capture agrees with majority of samples
-smd[smd$vcfID %in% strsplit(col.out[which(col.out$CloneIndex == 47),3],",")[[1]],]
-#Clone 154 - noted previously, cub recorded as M in the field, genotype looks F
-smd[smd$vcfID %in% strsplit(col.out[which(col.out$CloneIndex == 154),3],",")[[1]],]
+#Clone 30 - seen above, capture agrees with majority of samples
+smd[smd$vcfID %in% strsplit(col.out[which(col.out$CloneIndex == 30),3],",")[[1]],]
+#Clone 45 - seen above, capture agrees with majority of samples
+smd[smd$vcfID %in% strsplit(col.out[which(col.out$CloneIndex == 45),3],",")[[1]],]
+#Clone 140 - noted previously, cub recorded as M in the field, genotype looks F
+smd[smd$vcfID %in% strsplit(col.out[which(col.out$CloneIndex == 140),3],",")[[1]],]
 ```
 
 ## Compare Inferred Recaptures
@@ -499,7 +501,7 @@ range(plinkMatches$nsnp[which(plinkMatches$id1 %in% smd$vcfID[which(smd$GTservic
                          plinkMatches$id2 %in% smd$vcfID[which(smd$GTservice == "GTSeek")])])
 ```
 
-The filters for LGC samples (at least 100 SNPs genotyped) keep us from matching samples based on *very* few loci.  
+The filters for LGC samples (at least 50% of SNPs genotyped) keep us from matching samples based on *very* few loci.  
 
 ## Final Recapture Calls
 Now to combine the output from the two programs using the scheme described above. `COLONY` must be missing a few genotype matches. For each `COLONY` clone, are there samples that would have been combined by `PLINK`? If so, are *all* members of those clones also identified by `PLINK` as recaptures of the focal group? What is the mean kinship coefficient estimated between the samples associated with the two `COLONY` clones?  
@@ -699,7 +701,7 @@ hist(table(finalCloneDF$final), main = "Final Clone Membership",
      xlab = "Number of Initial Clones")
 
 #Spot checking moved clones...
-#Final Clone 4 - 5 other clones moved into clone 4
+#Final Clone 4 - 4 other clones moved into clone 4
 cloneInQ <- 4
 finalCloneDF[which(finalCloneDF$final == cloneInQ),]
 finalCloneDF[finalCloneDF$initial %in% 
@@ -735,8 +737,8 @@ boxplot(tmp.comp$kinship ~ boxlabs,
         ylab = "KING kinship", xlab = "Initial Clone Pair", 
         main = paste("Final Clone",cloneInQ), cex.axis = 0.5)
 
-#Final Clone 265 - 4 other clones moved into clone 265
-cloneInQ <- 265
+#Final Clone 248 - 5 other clones moved into clone 248
+cloneInQ <- 248
 finalCloneDF[which(finalCloneDF$final == cloneInQ),]
 finalCloneDF[finalCloneDF$initial %in% 
                unique(unlist(strsplit(
@@ -752,43 +754,6 @@ boxlabs <- apply(tmp.comp[,c("colclone1","colclone2")], 1,
 boxplot(tmp.comp$kinship ~ boxlabs, 
         ylab = "KING kinship", xlab = "Initial Clone Pair", 
         main = paste("Final Clone",cloneInQ), cex.axis = 0.5)
-
-#Final Clone 307 - 5 other clones moved into clone 307
-cloneInQ <- 307
-finalCloneDF[which(finalCloneDF$final == cloneInQ),]
-finalCloneDF[finalCloneDF$initial %in% 
-               unique(unlist(strsplit(
-                 finalCloneDF$possibles[finalCloneDF$final == cloneInQ],"_"))),]
-tmp.comp <- compare.out[which(
-  compare.out$colclone1 %in% 
-    finalCloneDF$initial[which(finalCloneDF$final == cloneInQ)] &
-    compare.out$colclone2 %in% 
-    finalCloneDF$initial[which(finalCloneDF$final == cloneInQ)] &
-    compare.out$colclone1 != compare.out$colclone2),]
-boxlabs <- apply(tmp.comp[,c("colclone1","colclone2")], 1, 
-                 FUN=function(x) paste(sort(x), collapse = "-"))
-boxplot(tmp.comp$kinship ~ boxlabs, 
-        ylab = "KING kinship", xlab = "Initial Clone Pair", 
-        main = paste("Final Clone",cloneInQ), cex.axis = 0.5)
-
-#Final Clone 324 - 7 other clones moved into clone 324
-cloneInQ <- 324
-finalCloneDF[which(finalCloneDF$final == cloneInQ),]
-finalCloneDF[finalCloneDF$initial %in% 
-               unique(unlist(strsplit(
-                 finalCloneDF$possibles[finalCloneDF$final == cloneInQ],"_"))),]
-tmp.comp <- compare.out[which(
-  compare.out$colclone1 %in% 
-    finalCloneDF$initial[which(finalCloneDF$final == cloneInQ)] &
-    compare.out$colclone2 %in% 
-    finalCloneDF$initial[which(finalCloneDF$final == cloneInQ)] &
-    compare.out$colclone1 != compare.out$colclone2),]
-boxlabs <- apply(tmp.comp[,c("colclone1","colclone2")], 1, 
-                 FUN=function(x) paste(sort(x), collapse = "-"))
-boxplot(tmp.comp$kinship ~ boxlabs, 
-        ylab = "KING kinship", xlab = "Initial Clone Pair", 
-        main = paste("Final Clone",cloneInQ), cex.axis = 0.5)
-
 
 ```
 
@@ -890,7 +855,7 @@ max(nSexGT2, na.rm = TRUE)
 which(nSexGT2 > 1)
 
 #They do in a few cases...
-#8, 14, 47, 307, 334
+#8, 14, 33, 45, 284
 
 #All of these were noted previously...
 #Clone 8 - 17 M 1 F, no direct captures
@@ -900,30 +865,30 @@ unique(smd$COLclone[which(smd$finalClone == 8)])
 compare.out[compare.out$colclone1 %in% smd$COLclone[which(smd$finalClone == 8)] & 
               compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == 8)] & 
               compare.out$iscloneCOL==FALSE,]
-#Clone 14 - 59 F, 2 M, 2 undet, no direct captures
+#Clone 14 - 56 F, 2 M, 2 undet, no direct captures
 table(smd$sexGT[smd$finalClone == 14])
 smd[which(smd$finalClone == 14),]
 unique(smd$COLclone[which(smd$finalClone == 14)])
 compare.out[compare.out$colclone1 %in% smd$COLclone[which(smd$finalClone == 14)] & 
               compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == 14)],]
-#Clone 47 - 5 F, 1 M, direct capture confirms majority
-table(smd$sexGT[smd$finalClone == 47])
-smd[which(smd$finalClone == 47),]
-unique(smd$COLclone[which(smd$finalClone == 47)])
-compare.out[compare.out$colclone1 %in% smd$COLclone[which(smd$finalClone == 47)] & 
-              compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == 47)],]
-#Clone 307 - 61 M, 1 F, 5 undet, no direct captures
-table(smd$sexGT[smd$finalClone == 307])
-smd[which(smd$finalClone == 307),]
-unique(smd$COLclone[which(smd$finalClone == 307)])
-compare.out[compare.out$colclone1 %in% smd$COLclone[which(smd$finalClone == 307)] & 
-              compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == 307)],]
-#Clone 334 - 23 F, 1 M, direct capture confirms F
-table(smd$sexGT[smd$finalClone == 334])
-smd[which(smd$finalClone == 334),]
-unique(smd$COLclone[which(smd$finalClone == 334)])
-compare.out[compare.out$colclone1 %in% smd$COLclone[which(smd$finalClone == 334)] & 
-              compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == 334)],]
+#Clone 33 - 62 M, 1 F, 5 undet, no direct captures
+table(smd$sexGT[smd$finalClone == 33])
+smd[which(smd$finalClone == 33),]
+unique(smd$COLclone[which(smd$finalClone == 33)])
+compare.out[compare.out$colclone1 %in% smd$COLclone[which(smd$finalClone == 33)] & 
+              compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == 33)],]
+#Clone 45 - 5 F, 1 M, direct capture confirms majority
+table(smd$sexGT[smd$finalClone == 45])
+smd[which(smd$finalClone == 45),]
+unique(smd$COLclone[which(smd$finalClone == 45)])
+compare.out[compare.out$colclone1 %in% smd$COLclone[which(smd$finalClone == 45)] & 
+              compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == 45)],]
+#Clone 284 - 23 F, 1 M, direct capture confirms F
+table(smd$sexGT[smd$finalClone == 284])
+smd[which(smd$finalClone == 284),]
+unique(smd$COLclone[which(smd$finalClone == 284)])
+compare.out[compare.out$colclone1 %in% smd$COLclone[which(smd$finalClone == 284)] & 
+              compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == 284)],]
 ```
 
 There's little ambiguity in any of these 5 cases.  
@@ -935,9 +900,9 @@ nRegion2
 which(nRegion2 > 1)
 smd$region[which(smd$finalClone == 3)] 
 #Not really 2 regions, just historic sample
-smd$region[which(smd$finalClone == 45)]
+smd$region[which(smd$finalClone == 43)]
 #Not really 2 regions, just historic sample
-smd$region[which(smd$finalClone == 295)] 
+smd$region[which(smd$finalClone == 243)] 
 #Not really 2 regions, just historic sample
 ```
 
@@ -974,12 +939,12 @@ sum(discrepancy, na.rm = TRUE) #Still only 3 cases with discrepancies...
 sum(multknown, na.rm = TRUE) #Still zero cases with multiple "known" sexes
 
 which(discrepancy == TRUE)
-#CloneIndex 47 - spotted above, direct capture agrees with majority - F
-smd[which(smd$finalClone == 47),]
-#CloneIndex 154 - spotted previously, direct captured cub
-smd[which(smd$finalClone == 154),]
-#CloneIndex 334 - spotted above, direct capture agrees with majority - F
-smd[which(smd$finalClone == 334),]
+#CloneIndex 45 - spotted above, direct capture agrees with majority - F
+smd[which(smd$finalClone == 45),]
+#CloneIndex 140 - spotted previously, direct captured cub
+smd[which(smd$finalClone == 140),]
+#CloneIndex 284 - spotted above, direct capture agrees with majority - F
+smd[which(smd$finalClone == 284),]
 ```
 
 ## Assign Final Sex
@@ -1010,6 +975,142 @@ smd[which(smd$finalSEX != smd$knownSEX & smd$knownSEX != ""),]
 # 655-23: clone 307, majority M no captures in matches
 smd[which(smd$finalSEX != smd$sexGT & smd$sexGT != "undet"),]
 ```
+
+## Compare kinship coefficients
+As one final check of the reliability of our assignments, we'll look at the distribution of KING kinship coefficients for samples from the same vs. different individual. We'll do this in two phases, first for technical replicates (accounting for inferred recaptures among replicated hair samples) and then for all SCR samples.  
+
+### Technical replicates
+First for only the technically replicated samples. Note that it's possible that we have recaptures represented in these, so we'll want to identify unique individuals from this set (as inferred above) before plotting the distribution within / between technical replicates.  
+```{r KINGreps}
+#Create an object for within vs. between clone comparisons - technical replicates
+king.allREP <- kingrel[
+  which(kingrel$id1 %in% smd$vcfID[which(smd$is.SCR == TRUE & 
+                                           smd$is.rep == TRUE)] &
+          kingrel$id2 %in% smd$vcfID[which(smd$is.SCR == TRUE & 
+                                             smd$is.rep == TRUE)]),]
+
+king.allREP$clone1 <- king.allREP$clone2 <- NA
+for(i in 1:nrow(king.allREP)) {
+  king.allREP$clone1[i] <- smd$finalClone[which(smd$vcfID == king.allREP$id1[i])]
+  king.allREP$clone2[i] <- smd$finalClone[which(smd$vcfID == king.allREP$id2[i])]
+}
+
+#Same Clone
+range(king.allREP$kinship[which(king.allREP$clone1 == king.allREP$clone2)])
+#Different Clone
+range(king.allREP$kinship[which(king.allREP$clone1 != king.allREP$clone2)])
+
+#Plot the distributions
+library(scales)
+same.clone <- density(king.allREP$kinship[which(king.allREP$clone1 == king.allREP$clone2)], bw = 0.025)
+diff.clone <- density(king.allREP$kinship[which(king.allREP$clone1 != king.allREP$clone2)], bw = 0.025)
+plot(diff.clone, xlim = c(min(king.allREP$kinship)-0.1, max(king.allREP$kinship)+0.1), 
+     ylim = c(0, 15), lwd = 1, col = "darkgrey", cex.axis = 0.9,
+     xlab = "KING kinship",  ylab = "Density", main = "")
+polygon(diff.clone, col = alpha("darkgrey", 0.5))
+lines(same.clone, col = "darkgreen")
+polygon(same.clone, col = alpha("darkgreen", 0.5))
+legend("topleft", bty = "n", cex = 0.75,
+       fill = c(alpha("darkgrey", 0.5), alpha("darkgreen", 0.5)), 
+       legend = c(paste("Different Clones - n =", 
+                        length(which(king.allREP$clone1 != king.allREP$clone2)),
+                        "comparisons"), 
+                  paste("Same Clones - n =",
+                        length(which(king.allREP$clone1 == king.allREP$clone2)),
+                        "comparisons")))
+mtext("Technical Replicates", cex = 1.1, adj = 1)
+```
+
+### All SCR samples
+Now for all SCR samples. Note the *very* large number of pairwise comparisons represented here.  
+```{r KINGall}
+## All SCR
+#Create an object for all SCR samples (that were assigned to a finalClone)
+keepVCFlist <- smd$vcfID[which(smd$is.SCR == TRUE & 
+                                 !is.na(smd$finalClone) & 
+                                 !is.na(smd$finalSEX))]
+kingSCR <- kingrel[which(kingrel$id1 %in% keepVCFlist & kingrel$id2 %in% keepVCFlist),]
+kingSCR$clone1 <- kingSCR$clone2 <- NA
+for(i in 1:nrow(kingSCR)) {
+  kingSCR$clone1[i] <- smd$finalClone[which(smd$vcfID == kingSCR$id1[i])]
+  kingSCR$clone2[i] <- smd$finalClone[which(smd$vcfID == kingSCR$id2[i])]
+}
+
+#Same Clone
+range(kingSCR$kinship[which(kingSCR$clone1 == kingSCR$clone2)])
+sum(kingSCR$kinship[which(kingSCR$clone1 == kingSCR$clone2)] < 0.45)
+
+#Different Clone
+range(kingSCR$kinship[which(kingSCR$clone1 != kingSCR$clone2)])
+kingSCR$nsnp[which(kingSCR$kinship >= 0.45 & kingSCR$clone1 != kingSCR$clone2)]
+
+same.cloneALL <- density(kingSCR$kinship[which(kingSCR$clone1 == kingSCR$clone2)], bw = 0.025)
+diff.cloneALL <- density(kingSCR$kinship[which(kingSCR$clone1 != kingSCR$clone2)], bw = 0.025)
+plot(diff.cloneALL, xlim = c(-0.8, 0.6),
+     ylim = c(0, 15), lwd = 1, col = "darkgrey", cex.axis=0.9,
+     xlab = "KING kinship",  ylab = "Density", main = "")
+polygon(diff.cloneALL, col = alpha("darkgrey", 0.5))
+lines(same.cloneALL, col = "darkgreen")
+polygon(same.cloneALL, col = alpha("darkgreen", 0.5))
+legend("topleft", bty = "n", cex = 0.75,
+       fill = c(alpha("darkgrey", 0.5), alpha("darkgreen", 0.5)), 
+       legend = c(paste("Different Clones - n =", 
+                        length(which(kingSCR$clone1 != kingSCR$clone2)),
+                        "comparisons"), 
+                  paste("Same Clones - n =",
+                        length(which(kingSCR$clone1 == kingSCR$clone2)),
+                        "comparisons")))
+mtext("All SCR Samples", cex = 1.1, adj = 1)
+```
+
+## Excessively high $H_o$
+As one final filter, we also want to check that none of the individuals identified in our sample have excessively high observed heterozygosity. This could be indicative of contamination of the sample. Below, we identify the sample with the least missing data for each individual in the dataset, extract this genotype, and calculate $F_{IS}$ for all individuals in the CGA population. Any individuals with $F_{IS} < -0.5$ will be removed from the dataset.  
+
+First, identify the best sample for each individual in CGA.  
+```{r IDbestSamp}
+CGAclones <- unique(smd$finalClone[
+  which(smd$region %in% c("CGA","CGA-H") & 
+          !is.na(smd$finalClone))])
+
+keepersCGA <- c()
+for(i in 1:length(CGAclones)) {
+  tmp <- smd[which(smd$finalClone == CGAclones[i]),]
+  keep.me <- which(tmp$nSNPgt == max(tmp$nSNPgt))
+  if(length(keep.me) > 1) {
+    keep.me <- keep.me[1]
+  }
+  keepersCGA[i] <- tmp$vcfID[keep.me]
+  rm(tmp, keep.me)
+}
+
+write.table(keepersCGA, "keeperClonesCGA.txt",
+            quote = FALSE,row.names = FALSE,col.names = FALSE)
+```
+
+Now calculate $F_{IS}$ for these individuals...  
+```{r engine="bash", comment = ""}
+vcftools --vcf ../snpfilteringfinalSCR.recode.vcf \
+          --keep keeperClonesCGA.txt --out CGA_Fcheck --het
+```
+
+Do we need to remove any for $F_{IS} < -0.5$?  
+```{r checkF}
+CGA_F <- read.table("CGA_Fcheck.het", header = TRUE)
+range(CGA_F$F)
+
+CGA_F[which(CGA_F$F < -0.5),]
+
+drop.us <- CGA_F$INDV[which(CGA_F$F < -0.5)]
+
+drop.clones <- smd$finalClone[which(smd$vcfID %in% drop.us)]
+
+table(smd$finalClone[which(smd$finalClone %in% drop.clones)])
+smd[which(smd$finalClone %in% drop.clones),]
+
+smd$FILT[which(smd$finalClone %in% drop.clones)] <- TRUE
+smd$finalClone[which(smd$finalClone %in% drop.clones)] <- NA
+```
+
 
 ## Final Summary
 How many total genotypes do we see in the dataset? How many from each region? How many male and female genotypes in our SCR datasets?  
