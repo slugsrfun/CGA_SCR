@@ -8,8 +8,6 @@ output:
 linkcolor: blue
 ---
 
-**ADD COMPARISON OF DISTANCES WITHIN AND BETWEEN YEARS - JUSTIFY STATIC AC**
-
 # Mapping Genotype Recaptures in Central GA
 This markdown will visualize the spatial distribution of bears with *spatial recaptures* from hair samples collected in central Georgia (2023 and 2024). These samples were genotyped via capture-seq (Rapid Genomics) or GT-seq (GTSeek). Capture-seq data were filtered to avoid tightly linked loci (no SNPs within 500kb with $r^2 > 0.8$) and focus on informative markers (MAF > 0.2) and combined with GT-seq data (which have a broader range of MAF), resulting in a total of 1325 SNP loci (see `4_combineGTSeek` for details on combining the data from the two marker panels). Genotypes were subjected to a clone analysis in `COLONY` ([Wang 2016](https://doi.org/10.1111/1755-0998.12452)) and KING kinship coefficients ([Manichaikul et al. 2010](https://doi.org/10.1093/bioinformatics/btq559)) were calculated in [`PLINK2`](https://www.cog-genomics.org/plink/2.0/) ([Chang et al. 2015](https://doi.org/10.1186/s13742-015-0047-8)). Inferences from the two approaches were combined following methods outlined in `10_recapFinal`.  
 
@@ -137,6 +135,144 @@ for(i in 1:nind) {
 ```
 
 Overall, it seems we have little evidence for movement of activity centers between years. By far, the furthest movements recorded in our capture histories come in a single week!  
+
+## Distances within and between years
+Nonetheless, let's look more closely at the question about movement of activity centers. We'll do this in a couple of ways. First, we'll calculate the centroid of trap locations where each individual was detected in each year, then record a distance between these centroids. Second, we'll calculate the maximum distance between detections for each individual across the study period (both years) and compare that to the maximum distance between two detections within a year. From the maps above, we expect to see maxium distances within, rather than among, years.  
+
+### Females
+First, for females...  
+```{r femDists}
+#Load capture history objects
+load("../scr/CGA_CH.Rda")
+
+#Load hair snare location data
+load("../sampleinfo/snareLocations.Rda")
+traps <- locs
+
+#Females first
+centroid.yr1 <- centroid.yr2 <- matrix(data = NA, nrow = dim(Fch$y)[1], ncol = 2)
+is.spatrecap <- max.within <- max.all <- dist.centroid <- max.yr1 <- max.yr2 <- c()
+
+for(i in 1:dim(Fch$y)[1]) {
+  is.spatrecap[i] <- (sum(rowSums(Fch$y[i,,,]) > 0) > 1)
+  yr1snares <- which(rowSums(Fch$y[i,,,1]) > 0)
+  yr2snares <- which(rowSums(Fch$y[i,,,2]) > 0)
+  
+  if(length(yr1snares) > 0) {
+    centroid.yr1[i,] <- colMeans(traps[yr1snares,])
+    if(length(yr1snares) > 1) {
+      max.yr1[i] <- max(dist(traps[yr1snares,], method = "euclidean"))
+    } else {
+      max.yr1[i] <- 0
+    }
+  } else {
+    max.yr1[i] <- 0
+  }
+  
+  if(length(yr2snares) > 0) {
+    centroid.yr2[i,] <- colMeans(traps[yr2snares,])
+    if(length(yr2snares) > 1) {
+      max.yr2[i] <- max(dist(traps[yr2snares,], method = "euclidean"))
+    } else {
+      max.yr2[i] <- 0
+    }
+  } else {
+    max.yr2[i] <- 0
+  }
+  
+  if(length(yr1snares) > 0 & length(yr2snares) > 0) {
+    dist.centroid[i] <- dist(rbind(centroid.yr1[i,], centroid.yr2[i,]), 
+                             method = "euclidean")
+  }
+  
+  max.within[i] <- max(c(max.yr1[i], max.yr2[i]))
+  if(length(yr1snares) > 0 & length(yr2snares > 0)) {
+    max.all[i] <- max(dist(traps[c(yr1snares,yr2snares),], 
+                           method = "euclidean"))
+  } else if(length(yr1snares) > 0 & length(yr2snares) == 0) {
+    max.all[i] <- max.yr1[i]
+  } else if(length(yr1snares) == 0 & length(yr2snares) > 0) {
+    max.all[i] <- max.yr2[i]
+  }
+    
+  rm(yr1snares, yr2snares)
+                                      
+}
+
+#Focusing on the spatial recaptures
+mean(dist.centroid[which(is.spatrecap == TRUE)], na.rm = TRUE)
+sr.max.within <- max.within[which(is.spatrecap == TRUE)]
+sr.max.all <- max.all[which(is.spatrecap == TRUE)]
+sum(is.spatrecap)
+sum(sr.max.within >= sr.max.all)
+```
+
+The average distance between yearly centroids for females with spatial recaptures was `r mean(dist.centroid[which(is.spatrecap == TRUE)], na.rm = TRUE)` m.  Among the `r sum(is.spatrecap)` females with spatial recaptures, `r sum(sr.max.within >= sr.max.all)` had their greatest distance between two detections *within a year*.  
+
+
+### Males
+Then for males...  
+```{r maleDists}
+#Now for males
+centroid.yr1 <- centroid.yr2 <- matrix(data = NA, nrow = dim(Mch$y)[1], ncol = 2)
+is.spatrecap <- max.within <- max.all <- dist.centroid <- max.yr1 <- max.yr2 <- c()
+
+for(i in 1:dim(Mch$y)[1]) {
+  is.spatrecap[i] <- (sum(rowSums(Mch$y[i,,,]) > 0) > 1)
+  yr1snares <- which(rowSums(Mch$y[i,,,1]) > 0)
+  yr2snares <- which(rowSums(Mch$y[i,,,2]) > 0)
+  
+  if(length(yr1snares) > 0) {
+    centroid.yr1[i,] <- colMeans(traps[yr1snares,])
+    if(length(yr1snares) > 1) {
+      max.yr1[i] <- max(dist(traps[yr1snares,], method = "euclidean"))
+    } else {
+      max.yr1[i] <- 0
+    }
+  } else {
+    max.yr1[i] <- 0
+  }
+  
+  if(length(yr2snares) > 0) {
+    centroid.yr2[i,] <- colMeans(traps[yr2snares,])
+    if(length(yr2snares) > 1) {
+      max.yr2[i] <- max(dist(traps[yr2snares,], method = "euclidean"))
+    } else {
+      max.yr2[i] <- 0
+    }
+  } else {
+    max.yr2[i] <- 0
+  }
+  
+  if(length(yr1snares) > 0 & length(yr2snares) > 0) {
+    dist.centroid[i] <- dist(rbind(centroid.yr1[i,], centroid.yr2[i,]), 
+                             method = "euclidean")
+  }
+  
+  max.within[i] <- max(c(max.yr1[i], max.yr2[i]))
+  if(length(yr1snares) > 0 & length(yr2snares > 0)) {
+    max.all[i] <- max(dist(traps[c(yr1snares,yr2snares),], 
+                           method = "euclidean"))
+  } else if(length(yr1snares) > 0 & length(yr2snares) == 0) {
+    max.all[i] <- max.yr1[i]
+  } else if(length(yr1snares) == 0 & length(yr2snares) > 0) {
+    max.all[i] <- max.yr2[i]
+  }
+  
+  rm(yr1snares, yr2snares)
+  
+}
+
+#Focusing on the spatial recaptures
+mean(dist.centroid[which(is.spatrecap == TRUE)], na.rm = TRUE)
+sr.max.within <- max.within[which(is.spatrecap == TRUE)]
+sr.max.all <- max.all[which(is.spatrecap == TRUE)]
+sum(is.spatrecap)
+sum(sr.max.within >= sr.max.all)
+```
+
+The average distance between yearly centroids for males with spatial recaptures was `r mean(dist.centroid[which(is.spatrecap == TRUE)], na.rm = TRUE)` m.  Among the `r sum(is.spatrecap)` males with spatial recaptures, `r sum(sr.max.within >= sr.max.all)` had their greatest distance between two detections *within a year*.  
+
 
 ---
 
