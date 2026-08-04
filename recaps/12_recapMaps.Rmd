@@ -207,7 +207,7 @@ sum(is.spatrecap)
 sum(sr.max.within >= sr.max.all)
 ```
 
-The average distance between yearly centroids for females with spatial recaptures was `r mean(dist.centroid[which(is.spatrecap == TRUE)], na.rm = TRUE)` m.  Among the `r sum(is.spatrecap)` females with spatial recaptures, `r sum(sr.max.within >= sr.max.all)` had their greatest distance between two detections *within a year*.  
+The average distance between yearly centroids for females with spatial recaptures was `r round(mean(dist.centroid[which(is.spatrecap == TRUE)], na.rm = TRUE), 1)` m.  Among the `r sum(is.spatrecap)` females with spatial recaptures, `r sum(sr.max.within >= sr.max.all)` had their greatest distance between two detections *within* a year.  
 
 
 ### Males
@@ -271,14 +271,14 @@ sum(is.spatrecap)
 sum(sr.max.within >= sr.max.all)
 ```
 
-The average distance between yearly centroids for males with spatial recaptures was `r mean(dist.centroid[which(is.spatrecap == TRUE)], na.rm = TRUE)` m.  Among the `r sum(is.spatrecap)` males with spatial recaptures, `r sum(sr.max.within >= sr.max.all)` had their greatest distance between two detections *within a year*.  
+The average distance between yearly centroids for males with spatial recaptures was `r round(mean(dist.centroid[which(is.spatrecap == TRUE)], na.rm = TRUE), 1)` m.  Among the `r sum(is.spatrecap)` males with spatial recaptures, `r sum(sr.max.within >= sr.max.all)` had their greatest distance between two detections *within* a year.  
 
 
 ---
 
 ## Digging in...
-### Female clone 7
-Looking more closely at the first female plotted (clone #7), which had a large within-week movement inferred...  
+### Female clone 43
+Looking more closely at the 9th female plotted (clone #43), which had a large within-week movement inferred during week 4 of 2023...  
 ```{r checkFem1}
 #Recreating the object that was used to build the female capture history...
 
@@ -295,64 +295,33 @@ colnames(sampsALL)[colnames(sampsALL) == "finalClone"] <- "cloneID"
 Fsamps <- sampsALL[which(sampsALL$finalSEX == "F"),]
 length(unique(Fsamps$cloneID[!is.na(Fsamps$cloneID)]))
 
-Fsamps[Fsamps$cloneID == 7,]
-table(Fsamps$snare[which(Fsamps$cloneID == 7)])
+Fsamps[Fsamps$cloneID == 43,]
+table(Fsamps$snare[which(Fsamps$cloneID == 43)])
 
 plot(S360)
-points(locs[rownames(locs) %in% Fsamps$utmSnare[Fsamps$cloneID == 7],])
-points(locs[rownames(locs) %in% Fsamps$utmSnare[which(Fsamps$cloneID == 7 & Fsamps$snare == "HS 066")],], pch = 19)
+points(locs[rownames(locs) %in% Fsamps$utmSnare[Fsamps$cloneID == 43],])
+points(locs[rownames(locs) %in% Fsamps$utmSnare[which(Fsamps$cloneID == 43 & Fsamps$snare == "HS 126")],], pch = 19)
 
-Fsamps[Fsamps$cloneID == 7 & Fsamps$snare == "HS 066",]
-
-```
-
-So the recapture inference in this case is from `COLONY`, not `PLINK` only, but the sample that is distant from the rest of the set did have fewer SNPs genotyped. Still well enough to make a reliable inference here, especially given the number of samples identified as part of this clone. It seems unlikely that this is a false-positive recapture.  
-
-### Female clone 45
-Clone #45 (the 9th female plotted) also had a large within-week movement (week 4 of 2023)...  
-```{r checkFem9}
-
-#Load sample metadata (smd)
-smd <- read.csv("../sampleinfo/sampleMetaData_cloneID.csv", header = TRUE)
-
-sampsALL <- smd[which(!is.na(smd$finalClone) &
-                        smd$is.SCR == TRUE & 
-                        smd$year %in% c(2023,2024)),]
-
-#Switch name of finalClone column for compatibility with makeCH function
-colnames(sampsALL)[colnames(sampsALL) == "finalClone"] <- "cloneID"
-
-Fsamps <- sampsALL[which(sampsALL$finalSEX == "F"),]
-length(unique(Fsamps$cloneID[!is.na(Fsamps$cloneID)]))
-
-Fsamps[Fsamps$cloneID == 45,]
-table(Fsamps$snare[which(Fsamps$cloneID == 45)])
-
-plot(S360)
-points(locs[rownames(locs) %in% Fsamps$utmSnare[Fsamps$cloneID == 45],])
-points(locs[rownames(locs) %in% 
-              Fsamps$utmSnare[which(Fsamps$cloneID == 45 & 
-                                      Fsamps$snare == "HS 126")],], pch = 19)
-
-Fsamps[Fsamps$cloneID == 45 & Fsamps$snare == "HS 126",]
-#This was a GTSeek sample originally assigned to clone ID 332...
-
-#Look closer at the original COLONY clone
-Fsamps[Fsamps$COLclone == 332,]
-#This includes samples from HS 66, 68, and 126!
+Fsamps[Fsamps$cloneID == 43 & Fsamps$snare == "HS 126",]
 
 #Check kinship of this original COLONY clone
 kingrel <- read.table("recapPLINK.kin0", header = FALSE)
 colnames(kingrel) <- c("id1","id2","nsnp","hehet","ibs0","kinship")
-kingrel$kinship[which(kingrel$id1 %in% Fsamps$vcfID[which(Fsamps$COLclone == 332)] & kingrel$id2 %in% Fsamps$vcfID[which(Fsamps$COLclone == 332)])]
+kingrel$kinship[which(kingrel$id1 %in% Fsamps$vcfID[which(Fsamps$COLclone == 282)] & kingrel$id2 %in% Fsamps$vcfID[which(Fsamps$COLclone == 282)])]
+
+#Samples assigned to the same original clone by COLONY
+Fsamps[which(Fsamps$COLclone == 282),]
+Fsamps[which(Fsamps$COLclone == 43),]
 
 #And kinship of the sample in question to other members of the final clone
-kingrel$kinship[which(kingrel$id1 == "GTS_107-23" & kingrel$id2 %in% Fsamps$vcfID[which(Fsamps$cloneID ==45)])]
-kingrel$kinship[which(kingrel$id1 %in% Fsamps$vcfID[which(Fsamps$cloneID ==45)] & kingrel$id2 == "GTS_107-23")]
+kingrel$kinship[which(kingrel$id1 == "GTS_107-23" & kingrel$id2 %in% Fsamps$vcfID[which(Fsamps$cloneID ==43)])]
+kingrel$kinship[which(kingrel$id1 %in% Fsamps$vcfID[which(Fsamps$cloneID ==43)] & kingrel$id2 == "GTS_107-23")]
 #Kinship is high to all other members of this final clone!
+
 ```
 
-Given the high kinship coefficients with all members of `finalClone` `45` and the presence of GTSeek samples from `HS 066`, `HS 068`, and `HS 126` in `COLONY` clone `332`, this movement also appears to be real!  
+So the recapture inference in this case is from `PLINK` only, not `COLONY`, and the sample was genotyped by GTseek, so it has fewer SNP loci available to make the match. The sample is well-genotyped, though. It appears that `COLONY` split detections of this individual by dataset - LGC and GTseek. GTseek detections include the same primary hair snares (HS 066 and HS 068) as in the LGC data. Given the uniformly high kinship coefficients among members of these two `COLONY` clones, it seems unlikely that the detection at HS 126 was a false-positive recapture.  
+
 
 ---
 
