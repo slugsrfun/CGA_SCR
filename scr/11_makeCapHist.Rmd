@@ -35,6 +35,11 @@ source("../input/makeCH.R")
 source("../input/sumstats_4d.R")
 ```
 
+Here's the function for making a capture history...  
+```{r makeCHfxn}
+writeLines(readLines("../input/makeCH.R"))
+```
+
 ## Closed population models
 Splitting the dataset up by year and sex...  
 ```{r makeCHclosed}
