@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8gb
-#SBATCH --time=8:00:00
+#SBATCH --time=6:00:00
 #SBATCH --output=/scratch/jdrobins/CGA_SCR/recaps/recapFinal.o
 #SBATCH --error=/scratch/jdrobins/CGA_SCR/recaps/recapFinal.o
 

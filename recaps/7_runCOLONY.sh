@@ -4,7 +4,7 @@
 #SBATCH --ntasks=8
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=64gb
-#SBATCH --time=48:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=/scratch/jdrobins/CGA_SCR/recaps/runCOLONY.o
 #SBATCH --error=/scratch/jdrobins/CGA_SCR/recaps/runCOLONY.o
 
