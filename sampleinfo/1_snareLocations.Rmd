@@ -9,11 +9,11 @@ linkcolor: blue
 ---
 
 # Formatting Snare Locations
-Here, we will create spatial objects with information on the location of hair snares (*i.e.*, traps) associated with the project. There are several input files needed...
+Here, we will create spatial objects with information on the location of each of the $J$ hair snares (*i.e.*, traps) associated with the project. There are several input files needed...
 
 1. `input/Hair Snare Summaries (Both Years).xlsx` - an Excel spreadsheet with information on landowners, locations, and weekly check dates for all hair snares in each of the two years of the project
-2. `input/HS23_coords.csv` - pulling a few columns out of the file above - 2023 tab
-3. `input/HS24_coords.csv` - pulling a few columns out of the file above - 2024 tab
+2. `input/HS23_coords.csv` - a handful of columns from the 2023 tab of the file above (Site Name, Landowner, Latitude, Longitude, Date Installed, Date Baited)
+3. `input/HS24_coords.csv` - a handful of columns from the 2024 tab of the file above (Site Name, Landowner, Latitude, Longitude, Date Installed, Date Baited)
 
 The primary outputs will include...
 
@@ -21,7 +21,7 @@ The primary outputs will include...
 2. `snareLocations.Rda` - an `.Rda` file with two objects
     + `locs` - coordinates for all unique hair snares associated with the project (a $J \times 3$ data frame)
     + `oper` - operational status of each hair snare in each of the two years (a $J \times 2$ data frame)
-3. `translatable.csv` - a table with translation information for the naming of hair snares in the project
+3. `translatable.csv` - a table with translation information for the naming of snares
 
 
 ## Load files
@@ -71,7 +71,7 @@ plot(st_geometry(gamap_utm))
 plot(st_geometry(hs23_utm), pch=1, col="blue", add=TRUE, cex = 0.75)
 plot(st_geometry(hs24_utm), pch="+", col="red", add=TRUE, cex = 0.75)
 
-#Plot it backwards to double check fine-scale positioning
+#Plot these objects in reverse order to double check fine-scale positioning
 #And with WGS and UTM next to one another to double check everything
 par(mfrow = c(1,2))
 #WGS84
@@ -105,9 +105,11 @@ bothyrs <- which(allnames %in% rownames(tmp23) & allnames %in% rownames(tmp24))
 checknames <- allnames[bothyrs]
 cnt <- 0 #Counter for matches
 for(x in 1:length(checknames)) {
-	if(tmp23[,"X"][rownames(tmp23) == checknames[x]] == tmp24[,"X"][rownames(tmp24) == checknames[x]] 
-	   & tmp23[,"Y"][rownames(tmp23) == checknames[x]] == tmp24[,"Y"][rownames(tmp24) == checknames[x]]) {
-		cnt <- cnt+1 #Add 1 to counter if the X and Y coords match when the trap name matches
+	if(tmp23[,"X"][rownames(tmp23) == checknames[x]] == 
+	   tmp24[,"X"][rownames(tmp24) == checknames[x]] 
+	   & tmp23[,"Y"][rownames(tmp23) == checknames[x]] == 
+	   tmp24[,"Y"][rownames(tmp24) == checknames[x]]) {
+		cnt <- cnt+1 #Add 1 to counter if the X and Y coords & trap name match
 	}
 }
 length(checknames)
@@ -178,8 +180,10 @@ for(x in 1:length(allnames)) {
 		tmpcoords24 <- c(HS24$Latitude[which(rownames(tmp24) == allnames[x])],
 		                 HS24$Longitude[which(rownames(tmp24) == allnames[x])])
 	}
-  translatable$east[x] <- traplocs[which(rownames(traplocs) == translatable$UTMname[x]),"East"]
-  translatable$north[x] <- traplocs[which(rownames(traplocs) == translatable$UTMname[x]),"North"]
+  translatable$east[x] <- traplocs[which(rownames(traplocs) == 
+                                           translatable$UTMname[x]),"East"]
+  translatable$north[x] <- traplocs[which(rownames(traplocs) == 
+                                            translatable$UTMname[x]),"North"]
   if(length(tmpcoords23) > 0 & length(tmpcoords24) > 0) {
     if(sum(tmpcoords23 == tmpcoords24)==2) {
       translatable$lat[x] <- tmpcoords23[1]
