@@ -19,5 +19,6 @@ Rscript render_snareLocations.R
 cp 1_snareLocations.pdf /home/jdrobins/CGA_SCR/PDFs
 cp snareLocations.Rda /home/jdrobins/CGA_SCR/sampleinfo
 cp translatable.csv /home/jdrobins/CGA_SCR/sampleinfo
+cp -r CGAsnarebuff /home/jdrobins/CGA_SCR/sampleinfo
 
 scontrol show job ${SLURM_JOB_ID}
