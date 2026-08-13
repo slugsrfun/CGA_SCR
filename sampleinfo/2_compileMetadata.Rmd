@@ -108,6 +108,12 @@ Some summaries of number of samples by region, year, week, snare, etc...
 ```{r summarize}
 smd <- sampleMetaData
 
+#Total number of samples processed by LGC
+nrow(smd)
+
+#Sample source
+table(smd$sampSOURCE)
+
 #Representation by year
 table(smd$year)
 #Representation of SCR samples by year
@@ -117,6 +123,8 @@ table(smd$year[which(smd$is.SCR==TRUE)])
 sum(smd$is.rep)
 #Number of SCR samples
 sum(smd$is.SCR)
+#Number of replicated SCR samples
+sum(smd$is.SCR & smd$is.rep)
 
 #Samples by week in 2023 and 2024
 table(smd$week[which(smd$year == 2023 & smd$is.SCR == TRUE)])
