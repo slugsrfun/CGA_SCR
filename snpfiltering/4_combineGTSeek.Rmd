@@ -19,7 +19,7 @@ Some of the samples with DNA yields too low for capture-seq at Rapid Genomics we
 5. record the number of SNPs genotyped for all samples in our `sampleMetadata` file
 6. drop samples that are not sufficiently genotyped prior to recapture analyses
     + for GTSeek samples, at least 100 SNPs genotyped
-    + for LGC samples, <50% missing data (in the combined dataset)
+    + for LGC samples, at least 30% of loci genotyped (in the combined dataset)
 
 We'll walk through these steps below. At the end of the markdown, we include a short section evaluating the power of the marker set via calculation of probabilities of identity for random individuals ($p_{\text{ID}}$) and for siblings ($p_{\text{IDsib}}$). These measure the chance that two unrelated individuals, or a pair of siblings, would share identical genotypes.  
 
@@ -402,7 +402,7 @@ write.table(vcfFormat, sep = "\t", file = "extraCols.vcf",
             quote = FALSE, row.names = FALSE, col.names = TRUE)
 ```
 
-It seems like this worked. Now we append it to the VCF (`cbind` in R = `paste` in bash) and save the output. Let's try to do this by first condensing the vcf into a simpler format. Note that we're working with a simple VCF output by `PLINK` as it is. The "FORMAT" here is only GT (genotypes only, no depth, quality, allele depth, genotype likelihoods, etc.).  
+Now we append it to the VCF (`cbind` in R = `paste` in bash) and save the output. Let's try to do this by first condensing the vcf into a simpler format. Note that we're working with a simple VCF output by `PLINK` as it is. The "FORMAT" here is only GT (genotypes only, no depth, quality, allele depth, genotype likelihoods, etc.).  
 ```{r engine="bash", comment = ""}
 #Drop all header lines except the column labels
 grep -v ^## LGC_allSCRsnps.vcf > lgc.vcf
@@ -480,7 +480,7 @@ for(i in 1:nrow(smd)) {
 
 #Set the thresholds
 GTS_thresh <- 100
-LGC_thresh <- missSNPs$N_DATA[1]*0.5
+LGC_thresh <- missSNPs$N_DATA[1]*0.3
 
 for(i in 1:nrow(smd)) {
   tmp <- which(missSNPs$INDV == smd$vcfID[i])
@@ -508,9 +508,9 @@ for(i in 1:nrow(smd)) {
 sum(smd$FILT)
 #Number NOT removed
 sum(!smd$FILT)
-#Number of GTSeek samples retained
+#Number of GTSeek samples with at least 100 SNPs genotyped
 sum(smd$nSNPgt[grep("GTS_", smd$vcfID)] >= GTS_thresh, na.rm = TRUE)
-#Number of LGC samples with 100+ SNPs genotyped
+#Number of LGC samples with at least 30% of SNPs genotyped
 sum(smd$nSNPgt[grep("UGA_", smd$vcfID)] >= LGC_thresh, na.rm = TRUE)
 
 #These should match
