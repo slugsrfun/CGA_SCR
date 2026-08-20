@@ -13,11 +13,11 @@ The raw VCF file is quite large (over 8Gb). We want to subset this large dataset
 
 The basic steps involved in the filters below include:
 
-0. Cleaning the raw VCF - remove duplicated lines, half-calls, indels
+0. Cleaning the raw VCF - remove duplicated lines, half-missing genotype calls, indels
 1. Quality filter at the locus level - drop the SNP locus if quality < 30
 2. Maximum depth filter at the locus level - drop SNP loci if total sequencing depth is > $2\sigma$ above mean total depth
 3. Min depth filter at the genotype level - don't call genotypes with < 10 reads
-4. Missing data filter - drop SNPs missing genotypes for > 30% of samples
+4. Missing data filter - drop SNPs missing genotypes for > 50% of samples
 5. Polymorphism filter - only retain loci that have exactly two alleles
 6. Minor allele frequency filter - keep sites with MAF > 0.2
 7. Avoiding linkage - prune markers based on LD within 500kb windows ($r^2$ < 0.8)
@@ -35,7 +35,7 @@ cp ../../LGC_BlackBears/UGA_173101/Delivery-20250620_merged/VCFs/UGA_173101_SNPs
 #Use bcftools norm to remove duplicate SNPs
 bcftools norm -d snps UGA_173101_SNPs_Raw.vcf -o filt0uniq.vcf
 
-#Use sed to replace the half-calls (./0 and ./1) with missing data (./.)
+#Use sed to replace the half-missing calls (./0 and ./1) with missing data (./.)
 grep ^# filt0uniq.vcf > filt0.vcf
 grep -v ^# filt0uniq.vcf | sed -e 's/\.\/[0,1]/\.\/\./g' | sed -e 's/[0,1]\/\./\.\/\./g' >> filt0.vcf
 
@@ -56,9 +56,9 @@ Plot some summaries of depth and missingness...
 depth <- read.table("raw.idepth", header = TRUE)
 miss <- read.table("raw.imiss", header = TRUE)
 
-hist(depth$MEAN_DEPTH, main = "Histogram of Average Sequencing Depth (per locus)", 
+hist(depth$MEAN_DEPTH, main = "Average Sequencing Depth (per locus)", 
      xlab = "Depth")
-hist(miss$F_MISS, main = "Histogram of Missing Data (per individual)",
+hist(miss$F_MISS, main = "Missing Data (per individual)",
      xlab = "Proportion Missing")
 
 #Quantiles of depth and missingness
@@ -140,13 +140,13 @@ snpct <- as.numeric(system("grep -v ^# filt3.recode.vcf | wc -l", intern=TRUE))
 ```
 
 ## Step 4: Missing Data (per locus)
-We also remove loci that are missing data for more than 30% of samples. Previous versions of the analysis used a much more relaxed filter that retained many of the loci removed here. However, the final SNP sets were similar in size, and the mean proportion of missing genotypes (across samples) is substantially reduced by imposing a higher threshold for retaining SNPs here. Note that the `--max-missing` argument to `vcftools` is defined such that "0 allows sites that are completely missing and 1 indicates no missing data allowed" ([`vcftools` manual](https://vcftools.sourceforge.net/man_latest.html)).  
+We also remove loci that are missing data for more than 50% of samples. This reduces the mean proportion of missing genotypes across samples substantially, compared to more relaxed missing data filters. Note that the `--max-missing` argument to `vcftools` is defined such that "0 allows sites that are completely missing and 1 indicates no missing data allowed" (see the [`vcftools` manual](https://vcftools.sourceforge.net/man_latest.html)).  
 
 Prior to these filters, we have `r snpct` loci in the VCF...  
 ```{r engine="bash", comment = ""}
 #Max missing is 30% of samples (per locus)
 vcftools --vcf filt3.recode.vcf --out filt4 \
-            --max-missing 0.7 --remove-filtered-all --recode
+            --max-missing 0.5 --remove-filtered-all --recode
 ```
 
 
@@ -200,7 +200,7 @@ snpct <- as.numeric(system("grep -v ^# filt5.recode.vcf | wc -l", intern=TRUE))
 ```
 
 ## Step 6: Minor Allele Frequency
-The power for individual identification is maximized in biallelic loci with equal allele frequencies ($p=q=0.5$). Thus, loci with high minor allele frequencies (MAF) will be the most useful for identifying recaptures. Here, we remove sites with $\text{MAF} < 0.2$. Note that the GT-seq panel that we're using has some low frequency SNPs included. In subsequent steps (*i.e.*, `4_combineGTSeek`), we'll come back to the raw VCF and extract genotypes for markers that are excluded here to retain SNPs that were genotyped via GT-seq. However, the bulk of our dataset will have high MAF, maximizing the information content of each genotyped SNP locus.  
+The power for individual identification is maximized in biallelic loci with equal allele frequencies ($p=q=0.5$). Thus, loci with high minor allele frequencies (MAF) will be the most useful for identifying recaptures. Here, we remove sites with $\text{MAF} < 0.2$. Note that the GT-seq panel that we're using has some low frequency SNPs included. In subsequent steps (*i.e.*, `4_combineGTSeek`), we'll come back to the raw VCF and extract genotypes for markers that are excluded here to retain loci from the GT-seq panel. However, the bulk of our dataset will have high MAF, maximizing the information content of each genotyped SNP locus.  
 
 Prior to these filters, we have `r snpct` loci in the VCF...  
 ```{r engine="bash", comment=""}
@@ -248,7 +248,7 @@ After all filters are applied, we have `r snpct` loci in the VCF. These will be 
 Now we'll i) summarize the extent of missing data in our filtered VCF and ii) record the number of genotyped markers for each sample in our metadata file.  
 
 ## Missingness
-After combining SNP genotypes from LGC / RapidGenomics with those from GTSeek, we will impose a filter to drop samples based on missing data. As a preliminary assessment of the number of samples we're likely to lose, we now evalute the proportion of missing data in the LGC SNP set.  
+After combining SNP genotypes from LGC / RapidGenomics with those from GTSeek, we will impose a filter to drop samples based on missing data. As a preliminary assessment of the number of samples we're likely to lose, we now evaluate the proportion of missing data in the LGC SNP set.  
 
 First, create files with summaries of the missing data levels by locus and by sample.  
 ```{r engine="bash", comment=""}
@@ -284,13 +284,17 @@ hist(missSamp$F_MISS,
 nrow(missSamp) #total samples in the VCF
 #Lost if keeping samples...
 sum(missSamp$F_MISS >= 0.9) # with <90% missing 
+sum(missSamp$F_MISS >= 0.8) # with <80% missing 
 sum(missSamp$F_MISS >= 0.7) # with <70% missing 
+sum(missSamp$F_MISS >= 0.6) # with <60% missing 
 sum(missSamp$F_MISS >= 0.5) # with <50% missing
+sum(missSamp$F_MISS >= 0.4) # with <40% missing
 sum(missSamp$F_MISS >= 0.3) # with <30% missing
+sum(missSamp$F_MISS >= 0.2) # with <20% missing
 sum(missSamp$F_MISS >= 0.1) # with <10% missing
 ```
 
-Given that the genotypes we are working with come from non-invasive (hair) samples, higher thresholds for successful genotyping are unrealistic. We will apply an intermediate threshold in the next step of the filtering pipeline (after incorporating samples genotyped by GTSeek).  
+Given that the genotypes we are working with come from non-invasive (hair) samples, higher thresholds for successful genotyping are unrealistic.   
 
 ## Record metadata
 Finally, add information on the number of SNPs genotyped in each sample to our sample metadata file.  
