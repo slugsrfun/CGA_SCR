@@ -22,7 +22,9 @@ For the capture-seq data from Rapid Genomics, we use data from three Y-chromosom
   
 
 ### Finding the Relevant Scaffolds
-There are several loci targeted by the capture-seq probe panel that should be useful for identifying the sex of individuals. These are all listed in the `FASTA_coverage` tab of [LGC_UGA_173101_BlackBearProbePanel.xlsx](https://docs.google.com/spreadsheets/d/18WTYfzYPhyIZcIf4AcKTfc8shdbIAJua/edit?usp=sharing&ouid=108908384617619788254&rtpof=true&sd=true) and in [Black Bear primer design.xlsx](https://docs.google.com/spreadsheets/d/10tIu7FyFX5RChB88E4G4GSgiBU7_5Ciymitw1_f5u60/edit?usp=sharing) (from Dr. Helen Bothwell). In particular, there are 7 markers listed there. We can match the accession numbers listed for these individuals to the `Probes` tab of the `BlackBearProbePanel` file above to identify the scaffolds associated with each marker. Here's some info about the loci:
+There are several loci targeted by the capture-seq probe panel that should be useful for identifying the sex of individuals. These are all listed in the `FASTA_coverage` tab of [LGC_UGA_173101_BlackBearProbePanel.xlsx](https://docs.google.com/spreadsheets/d/18WTYfzYPhyIZcIf4AcKTfc8shdbIAJua/edit?usp=sharing&ouid=108908384617619788254&rtpof=true&sd=true) and in [Black Bear primer design.xlsx](https://docs.google.com/spreadsheets/d/10tIu7FyFX5RChB88E4G4GSgiBU7_5Ciymitw1_f5u60/edit?usp=sharing) (from Dr. Helen Bothwell). In particular, there are 7 markers listed there. We can match the accession numbers listed for these individuals to the `Probes` tab of the `BlackBearProbePanel` file above to identify the scaffolds associated with each marker.  
+
+Here's some info about the loci:
 
 1. AB261815 - *Ursus arctos* X-specific ZFX gene ([Bidon et al. 2013](https://doi.org/10.1111/1755-0998.12072)) - NW_025576616.1
 2. HF547901 - *U. arctos* Y-specific non-coding ([Bidon et al. 2013](https://doi.org/10.1111/1755-0998.12072)) - NW_025577084.1 
@@ -87,16 +89,14 @@ sexdp <- read.table("sexing.gdepth", header = TRUE)
 ```
 
 ### Samples with excessive missing data
-Some individuals are poorly sequenced (see outliers in the plot above). We will remove samples from the dataset for SCR analyses if they are not well genotyped (GTseek samples with <100 genotyped loci, LGC samples with <50% genotyped loci). Those samples will also be removed from consideration for the population genetics analyses, as we can not verify that they constitute distinct individuals. Below is the full range of missing data and the distribution for samples that are filtered...  
+Some individuals are poorly sequenced (see outliers in the plot above). We will remove samples from the dataset for SCR analyses if they are not well genotyped (GTseek samples with <100 genotyped loci, LGC samples with <30% genotyped loci). Those samples will also be removed from consideration for the population genetics analyses, as we can not verify that they constitute distinct individuals. Below is the full range of missing data and the distribution for samples that are filtered...  
 ```{r dropInds}
 #Plot of levels of missing data across all loci...
 hist(allmiss$F_MISS, main = "Proportion of missing data", 
-     xlab = "Missing Data", ylab = "Individuals")
-abline(v = 0.75, lwd = 2, col = "red")
-abline(v = 0.5, lwd = 2, col = "blue")
-legend("top", text.col=c("blue", "red"),
-       legend=c(paste("n =", sum(allmiss$F_MISS > 0.5), "with >50% missing"),
-                paste("n =", sum(allmiss$F_MISS > 0.70), "with >70% missing")))
+     xlab = "Missing Data", ylab = "Samples")
+abline(v = 0.7, lwd = 2, col = "red")
+legend("top", text.col="red", 
+       legend=paste("n =", sum(allmiss$F_MISS > 0.7), "with >70% missing"))
 
 #Boxplot of missing data for all samples, retained samples, and filtered samples
 boxplot(
@@ -107,7 +107,7 @@ boxplot(
                          sampleMetadata$vcfID[which(sampleMetadata$FILT == TRUE)])],
   names = c("ALL","KEPT","CUT"), ylab = "Proportion of loci missing")
 ```
-Filtering samples that were genotyped at fewer than 100 (GTSeek) or 50% (LGC) SNPs from the set used for recapture analyses resulted in `r sum(sampleMetadata$FILT)` samples being removed from the dataset.  
+Filtering samples that were genotyped at fewer than 100 SNPs (GTSeek) or 30% of all loci (LGC) from the set used for recapture analyses resulted in `r sum(sampleMetadata$FILT)` samples being removed from the dataset.  
 
 ### Subset to regions of interest
 We'll retain the full scaffold for *ZFX*, but for *AMELY* (the variant of amelogenin found on the Y-chromosome), we'll still restrict our sex identification analysis to the specific window on scaffold `NW_025578353`.    
@@ -160,7 +160,7 @@ boxplot(colSums(sexdp[sexdp$CHROM=="NW_025576616.1",] == -1)
         xlab = "Scaffolds")
 ```
 
-The plot shows the distribution of proportions of *samples* missing data at SNPs on each of the scaffolds. As expected, more samples are missing data for SNPs on scaffolds associated with the Y-chromosome that for SNPs that are NOT on the Y. It appears that roughly half of the samples are missing 100% of SNPs for *ncY* and *SMCY*, as we might expect with roughly equal numbers of male and female samples in the dataset.  
+The plot shows the distribution of proportions of *samples* missing data at SNPs on each of the scaffolds. As expected, more samples are missing data for SNPs on scaffolds associated with the Y-chromosome that for SNPs that are NOT on the Y. It appears that roughly half of the samples are missing 100% of SNPs for *ncY* and *SMCY*, as we might expect if there were roughly equal numbers of male and female samples in the dataset.  
 
 ### Count Votes
 Focusing on the Y-specific regions, we give each of the three scaffolds a vote for male or female. We also impose a minimum depth threshold (across the region) that needs to be met to "detect" the Y chromosome in a sample. We set this threshold to $\ge 5$ sequence reads for least one SNP on the segment. So at least one SNP on each Y-chromosome scaffold needs to be genotyped at this depth to provide a "male" vote. Two male votes are required to assign sex as male.   
@@ -279,7 +279,7 @@ table(FMratio)
 ```
 
 ### Assign sexes
-Clearly, ther are many cases where not all 6 loci agree on an individual's sex. However, the vast majority of samples appear to show a good deal of agreement among markers. With this in mind, we set a threshold of 4 votes one way or the other. A sample needs to have at least four votes for male or female. If it does, we have a majority and we will assign that sex to the sample. If there are fewer than 4 loci genotyped, or fewer than 4 loci agree on the sex one way or the other, we leave sex undetermined.  
+Clearly, there are many cases where not all 6 loci agree on an individual's sex. However, the vast majority of samples appear to show a good deal of agreement among markers. With this in mind, we set a threshold of 4 votes one way or the other. A sample needs to have at least four votes for male or female. If it does, we have a majority and we will assign that sex to the sample. If there are fewer than 4 loci genotyped, or fewer than 4 loci agree on the sex one way or the other, we leave sex undetermined.  
 ```{r assignSex_GTSeek}
 #Loop through the list and assign sexes
 GTS_SXout <- c()
@@ -294,7 +294,7 @@ for(i in 1:nrow(sexSNPs)) {
   }
 }
 
-length(GTS_SXout) #Should be 998 calls here
+length(GTS_SXout) 
 table(GTS_SXout)
 ```
 
