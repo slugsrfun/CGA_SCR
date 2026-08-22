@@ -856,9 +856,18 @@ max(nSexGT2, na.rm = TRUE)
 which(nSexGT2 > 1)
 
 #They do in a few cases...
-#14, 30, 45, 254, 270
+#8, 14, 33, 45, 298
 
-#All of these were noted previously...
+#Clone 8 
+cloneInQ <- 8
+table(smd$sexGT[smd$finalClone == cloneInQ])
+table(smd$knownSEX[smd$finalClone == cloneInQ])
+#Kinship values for samples assigned to different clones by COLONY
+quantile(compare.out$kinship[
+  compare.out$colclone1 %in% smd$COLclone[which(smd$finalClone == cloneInQ)] & 
+    compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == cloneInQ)] & 
+    compare.out$iscloneCOL==FALSE])
+
 #Clone 14 
 cloneInQ <- 14
 table(smd$sexGT[smd$finalClone == cloneInQ])
@@ -869,8 +878,8 @@ quantile(compare.out$kinship[
     compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == cloneInQ)] & 
     compare.out$iscloneCOL==FALSE])
 
-#Clone 30
-cloneInQ <- 30
+#Clone 33
+cloneInQ <- 33
 table(smd$sexGT[smd$finalClone == cloneInQ])
 table(smd$knownSEX[smd$finalClone == cloneInQ])
 #Kinship values for samples assigned to different clones by COLONY
@@ -889,18 +898,8 @@ quantile(compare.out$kinship[
     compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == cloneInQ)] & 
     compare.out$iscloneCOL==FALSE])
 
-#Clone 254
-cloneInQ <- 254
-table(smd$sexGT[smd$finalClone == cloneInQ])
-table(smd$knownSEX[smd$finalClone == cloneInQ])
-#Kinship values for samples assigned to different clones by COLONY
-quantile(compare.out$kinship[
-  compare.out$colclone1 %in% smd$COLclone[which(smd$finalClone == cloneInQ)] & 
-    compare.out$colclone2 %in% smd$COLclone[which(smd$finalClone == cloneInQ)] & 
-    compare.out$iscloneCOL==FALSE])
-
-#Clone 270
-cloneInQ <- 270
+#Clone 298
+cloneInQ <- 298
 table(smd$sexGT[smd$finalClone == cloneInQ])
 table(smd$knownSEX[smd$finalClone == cloneInQ])
 #Kinship values for samples assigned to different clones by COLONY
@@ -919,9 +918,9 @@ nRegion2
 which(nRegion2 > 1)
 smd$region[which(smd$finalClone == 3)] 
 #Not really 2 regions, just historic sample
-smd$region[which(smd$finalClone == 61)]
+smd$region[which(smd$finalClone == 43)]
 #Not really 2 regions, just historic sample
-smd$region[which(smd$finalClone == 296)] 
+smd$region[which(smd$finalClone == 257)] 
 #Not really 2 regions, just historic sample
 ```
 
@@ -958,12 +957,13 @@ sum(discrepancy, na.rm = TRUE) #Still only 3 cases with discrepancies...
 sum(multknown, na.rm = TRUE) #Still zero cases with multiple "known" sexes
 
 which(discrepancy == TRUE)
-#CloneIndex 30 - spotted above
-table(smd$knownSEX[which(smd$finalClone == 30)])
-#CloneIndex 45 - spotted previously, direct captured cub
+#CloneIndex 45 - spotted above, direct capture agrees with majority
 table(smd$knownSEX[which(smd$finalClone == 45)])
-#CloneIndex 144 - spotted above, direct capture agrees with majority - F
+#CloneIndex 144 - spotted previously, direct captured cub
 table(smd$knownSEX[which(smd$finalClone == 144)])
+#CloneIndex 298 - spotted above, direct capture agrees with majority
+table(smd$knownSEX[which(smd$finalClone == 298)])
+
 ```
 
 ## Assign Final Sex
