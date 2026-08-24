@@ -304,23 +304,12 @@ table(Fsamps$snare[which(Fsamps$cloneID == 7)])
 
 plot(S360)
 points(locs[rownames(locs) %in% Fsamps$utmSnare[Fsamps$cloneID == 7],])
-points(locs[rownames(locs) %in% Fsamps$utmSnare[which(Fsamps$cloneID == 7 & Fsamps$snare == "HS 066")],], pch = 19)
+points(locs[rownames(locs) %in% 
+              Fsamps$utmSnare[which(Fsamps$cloneID == 7 & 
+                                      Fsamps$snare == "HS 066")],], 
+       pch = 19)
 
 Fsamps[Fsamps$cloneID == 7 & Fsamps$snare == "HS 066",]
-
-#Check kinship of this original COLONY clone
-kingrel <- read.table("recapPLINK.kin0", header = FALSE)
-colnames(kingrel) <- c("id1","id2","nsnp","hehet","ibs0","kinship")
-kingrel$kinship[which(kingrel$id1 %in% Fsamps$vcfID[which(Fsamps$COLclone == 282)] & kingrel$id2 %in% Fsamps$vcfID[which(Fsamps$COLclone == 282)])]
-
-#Samples assigned to the same original clone by COLONY
-Fsamps[which(Fsamps$COLclone == 282),]
-Fsamps[which(Fsamps$COLclone == 43),]
-
-#And kinship of the sample in question to other members of the final clone
-kingrel$kinship[which(kingrel$id1 == "GTS_107-23" & kingrel$id2 %in% Fsamps$vcfID[which(Fsamps$cloneID ==43)])]
-kingrel$kinship[which(kingrel$id1 %in% Fsamps$vcfID[which(Fsamps$cloneID ==43)] & kingrel$id2 == "GTS_107-23")]
-#Kinship is high to all other members of this final clone!
 
 ```
 
@@ -349,22 +338,32 @@ table(Fsamps$snare[which(Fsamps$cloneID == 43)])
 
 plot(S360)
 points(locs[rownames(locs) %in% Fsamps$utmSnare[Fsamps$cloneID == 43],])
-points(locs[rownames(locs) %in% Fsamps$utmSnare[which(Fsamps$cloneID == 43 & Fsamps$snare == "HS 126")],], pch = 19)
+points(locs[rownames(locs) %in% 
+              Fsamps$utmSnare[which(Fsamps$cloneID == 43 & 
+                                      Fsamps$snare == "HS 126")],], 
+       pch = 19)
 
 Fsamps[Fsamps$cloneID == 43 & Fsamps$snare == "HS 126",]
 
 #Check kinship of this original COLONY clone
 kingrel <- read.table("recapPLINK.kin0", header = FALSE)
 colnames(kingrel) <- c("id1","id2","nsnp","hehet","ibs0","kinship")
-kingrel$kinship[which(kingrel$id1 %in% Fsamps$vcfID[which(Fsamps$COLclone == 296)] & kingrel$id2 %in% Fsamps$vcfID[which(Fsamps$COLclone == 296)])]
+kingrel$kinship[which(kingrel$id1 %in% 
+                        Fsamps$vcfID[which(Fsamps$COLclone == 296)] & 
+                        kingrel$id2 %in% 
+                        Fsamps$vcfID[which(Fsamps$COLclone == 296)])]
 
 #Samples assigned to the same original clone by COLONY
 Fsamps[which(Fsamps$COLclone == 296),]
 Fsamps[which(Fsamps$COLclone == 43),]
 
 #And kinship of the sample in question to other members of the final clone
-kingrel$kinship[which(kingrel$id1 == "GTS_107-23" & kingrel$id2 %in% Fsamps$vcfID[which(Fsamps$cloneID ==43)])]
-kingrel$kinship[which(kingrel$id1 %in% Fsamps$vcfID[which(Fsamps$cloneID ==43)] & kingrel$id2 == "GTS_107-23")]
+kingrel$kinship[which(kingrel$id1 == "GTS_107-23" & 
+                        kingrel$id2 %in% 
+                        Fsamps$vcfID[which(Fsamps$cloneID ==43)])]
+kingrel$kinship[which(kingrel$id1 %in% 
+                        Fsamps$vcfID[which(Fsamps$cloneID ==43)] & 
+                        kingrel$id2 == "GTS_107-23")]
 #Kinship is high to all other members of this final clone!
 
 #Did this clone get split by genotyping service?
