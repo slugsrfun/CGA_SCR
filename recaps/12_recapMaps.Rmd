@@ -328,7 +328,7 @@ The distant sample in this case was identified as a recapture by COLONY, not PLI
 
 ### Female clone 43
 Looking more closely at the 9th female plotted (clone #43), which had a large within-week movement inferred during week 4 of 2023...  
-```{r checkFem1}
+```{r checkFem2}
 #Recreating the object that was used to build the female capture history...
 
 #Load sample metadata (smd)
