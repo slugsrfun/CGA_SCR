@@ -1,5 +1,5 @@
 # CGA_BlackBears
-Data analyses for central GA black bear SCR / PopGen project at UGA
+Data analyses for central GA black bear SCR models
 
 ## Directory Structure
 
@@ -9,7 +9,8 @@ Data analyses for central GA black bear SCR / PopGen project at UGA
     + `0_build_ve.sh` - script used (interactively) to build the virtual environment for analyses that follow
     + `veGAbears_pkglist.txt` - explicit list of packages installed in creation of the virtual environment `veGAbears`
 + `/input/` - variety of files needed as input in analysis scripts
-    + `CGA_SCR.jag` - `JAGS` model modified from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), without density-dependent recruitment and modeling both sexes in the same analysis (two separate capture history objects)
+    + `CGA_SCR_v1.jag` - `JAGS` model modified from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), without density-dependent recruitment and modeling both sexes in the same analysis (two separate capture history objects), single recruitment rate
+    + `CGA_SCR_v2.jag` - `JAGS` model modified from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), without density-dependent recruitment and modeling both sexes in the same analysis (two separate capture history objects), sex-specific recruitment rate
     + `CGAmortalities.csv` - DNR records on mortality due to legal harvest, illegal take, and roadkill in the central GA black bear population
     + `Clearcut` - polygon of Southern Timber clearcut boundaries (shapefile format) for solar farm project (2023-2024) 
     + `colonydat_create2.R` - modified version of function to create `COLONY` input files, from [Ellie Weise's GitHub](https://github.com/weiseell/NbdLamprey/blob/master/Homebrew/colonydat_create.R)
@@ -49,7 +50,7 @@ Data analyses for central GA black bear SCR / PopGen project at UGA
 + `/scr/` - spatial capture-recapture modeling
     + `11_makeCapHist` - create a capture history object for SCR modeling
         + `CGA_CH.Rda` - saved capture history objects created in the step above
-    + `13_fitHooker_bothSexes2` - fit a version of the Hooker et al. (2020) model that incorporates data from both male and female bears, using separate capture history objects
+    + `13_fitHooker_bothSexes` - fit and compare modified versions of the Hooker et al. (2020) model that incorporate data from both male and female bears, using separate capture history objects
 + `/other/` - additional analyses that don't fit into the categories above
     + `14_assessPVA` - comparing abundances estimated in our SCR models to predictions from the PVA of Hooker et al. (2020), given observed mortalities
     + `forc-h0.gzip` - forecasted abundance from PVA simulations under status quo harvest, created during `14_assessPVA`
@@ -73,6 +74,6 @@ Data analyses for central GA black bear SCR / PopGen project at UGA
 10. `recaps/10_recapFinal` - combine output from `PLINK2` and `COLONY`, check for missed recaptures in duplicated samples, check sex inference in sets of recaptures, map inferred spatial recaptures, assign final `cloneID` and sex
 11. `scr/11_makeCapHist` - create capture histories for SCR analyses
 12. `recaps/12_recapMaps` - creating maps of detections for all individuals with spatial recaptures (run locally!)
-13. `scr/13_fitHooker_bothSexes2` - fit a version of the model from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) that incorporates data from both sexes in `rjags` - with separate data augmentation for males and females
+13. `scr/13_fitHooker_bothSexes` - fit and compare versions of the model from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) that incorporate data from both sexes in `rjags` - with separate data augmentation for males and females
 14. `other/14_assessPVA` - compare the abundance estimates from SCR models to predictions from PVA in [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), given information on known mortalities
 
