@@ -506,8 +506,8 @@ save(waic.out, file="waic_bothSexes_v1.gzip")
 stopCluster(cl1)
 ```
 
-## Compute WAIC - Version 2
-```{r WAIC2}
+## Compute WAIC - Version 1
+```{r WAIC1}
 load("waic_bothSexes_v1.gzip")
 
 p_waic_i <- rowMeans(cbind(waic.out[[1]]$WAIC, 
