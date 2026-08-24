@@ -21,5 +21,7 @@ conda deactivate
 cp 13_fitHooker_bothSexes.pdf /home/jdrobins/CGA_SCR/PDFs/
 cp samples-bothSexes_v1.gzip /home/jdrobins/CGA_SCR/scr/
 cp samples-bothSexes_v2.gzip /home/jdrobins/CGA_SCR/scr/
+cp waic-bothSexes_v1.gzip /home/jdrobins/CGA_SCR/scr/
+cp waic-bothSexes_v2.gzip /home/jdrobins/CGA_SCR/scr/
 
 scontrol show job ${SLURM_JOB_ID}
