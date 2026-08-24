@@ -9,19 +9,19 @@ linkcolor: blue
 ---
 
 # Building Capture Histories for SCR Analyses
-In this markdown, we'll create capture histories for the SCR analyses that follow. Each object will include i) a `y` array of capture histories (with `dim = c(i, j, k, t)`, individuals, traps, occasions, years), ii) a `pc` array (of similar dimensions) with previous capture information (for models with a local behavioral effect), and iii) a `clone` vector that has identifiers for each individual $i$ (from the `finalClone` column of our `sampleMetadata` file). We want to build several of these objects, given interest in fitting different (open vs. closed) models. 
+In this markdown, we'll create capture histories for the SCR analyses that follow. Each object will include i) a `y` array of capture histories (with `dim = c(i, j, k, t)`, individuals, traps, occasions, years), ii) a `pc` array (of matching dimensions) with previous capture information (to allow us to model a local behavioral effect of capture), and iii) a `clone` vector that has identifiers for each individual $i$ (from the `finalClone` column of our `sampleMetadata` file). We build several of these objects, which would allow fitting different (open vs. closed) SCR models.  
 
-1. For closed population models - data for two years saved separately (3-d array), separate for the two sexes as well
+1. For closed population models - data for the two years are saved separately (in two 3-d arrays), also separate for the two sexes
     + Females in 2023
     + Females in 2024
     + Males in 2023
     + Males in 2024
-2. For open population models - two years combined (4-d array), but still modeling the sexes separately
+2. For open population models - data for the two years are combined (4-d array), but we still keep sexes separate
     + Females (2023 and 2024)
     + Males (2023 and 2024)
 
 ## Load data, source function
-Load *i*) the sample metadata with clone ID information and *ii*) the `.Rda` with locations and yearly operational status of hair snares. Source in functions for *i*) building capture history and previous capture objects and *ii*) calculating summaries of capture histories from a 3-d or 4-d `y` array (based on a function from the [`scrbook` R package](https://github.com/jaroyle/scrbook)).  
+Load *i*) the sample metadata with clone ID information and *ii*) the `.Rda` with locations and yearly operational status of hair snares. Source in functions for *i*) building capture history and previous capture objects and *ii*) calculating summaries of capture histories from a 3-d or 4-d `y` array (based on a function from the [`scrbook` R package](https://github.com/jaroyle/scrbook); Royle et al. 2017).  
 ```{r loadData}
 #Load sample metadata (smd)
 smd <- read.csv("../sampleinfo/sampleMetaData_cloneID.csv", header = TRUE)
