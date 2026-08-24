@@ -51,6 +51,8 @@ Data analyses for central GA black bear SCR models
     + `11_makeCapHist` - create a capture history object for SCR modeling
         + `CGA_CH.Rda` - saved capture history objects created in the step above
     + `13_fitHooker_bothSexes` - fit and compare modified versions of the Hooker et al. (2020) model that incorporate data from both male and female bears, using separate capture history objects
+        + `samples-bothSexes_[version].gzip` - posterior samples for model parameters (including $s$ and $z$)
+        + `waic-bothSexes_[version].gzip` - R objects used to calculate Widely Applicable Information Criterion (WAIC) for model comparison
 + `/other/` - additional analyses that don't fit into the categories above
     + `14_assessPVA` - comparing abundances estimated in our SCR models to predictions from the PVA of Hooker et al. (2020), given observed mortalities
     + `forc-h0.gzip` - forecasted abundance from PVA simulations under status quo harvest, created during `14_assessPVA`
