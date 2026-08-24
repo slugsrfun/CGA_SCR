@@ -8,29 +8,32 @@ output:
 linkcolor: blue
 ---
 
-# Fitting a model similar to that from Hooker et al. (2020) with *both sexes*
+# Fitting models similar to that from Hooker et al. (2020) with *both sexes*
 The manuscript by [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) fit an open-population SCR model to recapture data from female black bears in central GA using hair samples collected over a period of 5 years (2012-2016). They compared several models (see their Table 2), but the best-fit model included a constant survival rate across years, density-dependent per capita recruitment, year-specific baseline detection probabilities, and a local behavioral response to capture. Estimates of abundance from their analysis ranged from 106 to 166 across the study period.  
 
-Here, we attempt to use Hooker et al. (2020)'s code (from [github.com/rbchan/ga-bear-pva](https://github.com/rbchan/ga-bear-pva)) to fit a very similar model to data hair samples collected in 2023 and 2024 (from *both male and female bears*) in the same area. In particular, the analysis below draws heavily from their [fit.R](https://github.com/rbchan/ga-bear-pva/blob/master/R/fit.R) script and their [`JAGS` model](https://github.com/rbchan/ga-bear-pva/blob/master/R/dT-s0-rPDD2-phi0-pYB-sig0.jag), and uses their [state space `.tif` file](https://raw.githubusercontent.com/rbchan/ga-bear-pva/refs/heads/master/data/state-space360.tif).  
+Here, we modify code from Hooker et al. (2020) (available at: [github.com/rbchan/ga-bear-pva](https://github.com/rbchan/ga-bear-pva)) to fit and compare two very similar models to capture histories from hair samples collected in 2023 and 2024 (from *both male and female bears*) in the same area. In particular, the analysis below draws heavily from Hooker et al.'s  [fit.R](https://github.com/rbchan/ga-bear-pva/blob/master/R/fit.R) script and their [`JAGS` model](https://github.com/rbchan/ga-bear-pva/blob/master/R/dT-s0-rPDD2-phi0-pYB-sig0.jag), and uses their [state space `.tif` file](https://raw.githubusercontent.com/rbchan/ga-bear-pva/refs/heads/master/data/state-space360.tif).  
 
-The`JAGS` model from the Hooker manuscript is modified extensively below. Specifically, we remove the density-dependence of per-capita recruitment (with only 1 recruitment period, this should have little effect on the model). We also fit the model to data from both sexes and include several sex-specific parameters. We model differences in the sexes for the following: 
+The`JAGS` model from the Hooker manuscript is modified below. Specifically, we remove the density-dependence of per-capita recruitment (with only 1 recruitment period, this should have little effect on the model). We also fit the model to data from both sexes and include several sex-specific parameters. The models we compare differ in the recruitment rate, $\gamma$, with version 1 having the same rate for males and females (*n.b.,* realized number of recruits still vary between sexes) and version 2 incorporating a sex-specific $\gamma$.  
+
+Differences between the sexes were included for the following parameters: 
 
 i. $p_0$ - baseline detection probability, probability of detection when an individual's activity center is in the same location as a hair snare
-ii. $\kappa$ - the (local) behavioral effect of capture, assumed to increase $p_0$ for individuals that have previously been detected in a specific location 
+ii. $\kappa$ - the (local) behavioral effect of capture, assumed to increase $p_0$ for individuals that have previously been detected in a specific location (*i.e.,* "trap happy" behavior)
 iii. $\sigma$ - the decay rate of detection probability with distance (related to movement)
-iv. $\phi$ - (apparent) survival rate between primary sampling periods (years)
-v. $\gamma$ - recruitment rate, which includes survival until bears are old enough to show up in our hair snare samples
-vi. $\psi$ - the data augmentation parameter, as males and females are separated in the model
+iv. $\phi$ - (apparent) survival between primary sampling periods (years)
+v. $\psi$ - the data augmentation parameter, as males and females are augmented separately in the model
+vi. $\gamma$ (*in version 2*) - recruitment rate, which includes survival until bears are old enough to recruit to the sample 
+
 
 We augment the male and female capture histories separately, so much of the code in the model is duplicated. This also means we have separate objects in the model for the male and female activity centers, individual alive/dead/available statuses, and so on. We will need to initialize these variables separately for males and females, so there will be a bit more to organize in the `JAGS data` and `inits` portions.  
 
-Here's the `JAGS` model we're using...  
+Here's version 1 of the `JAGS` model we're using. Note that version 2 incorporates sex-specific $\gamma$...  
 ```{r JAGSmodelCode}
-writeLines(readLines("../input/CGA_SCR.jag"))
+writeLines(readLines("../input/CGA_SCR_v1.jag"))
 ```
 
 ## Load the data
-We do NOT need to create a combined capture history object, since we augment male and female capture histories separately in our model.  
+We do NOT need to create a combined capture history object, since we augment male and female capture histories separately in the model.  
 ```{r loadData}
 #Load and collect the necessary data objects
 load("CGA_CH.Rda")
@@ -53,12 +56,19 @@ dim(Fch$y)
 dim(Mch$pc)
 dim(Fch$pc)
 
+#Overall summaries of captures
 sumstats_4d(Fch$y)
 sumstats_4d(Mch$y)
+
+#Yearly summaries of captures
+sumstats_3d(F23$y)
+sumstats_3d(F24$y)
+sumstats_3d(M23$y)
+sumstats_3d(M24$y)
 ```
 
 ## Rerun `fit.R`
-From here on out, we'll follow along with the [fit.R](https://github.com/rbchan/ga-bear-pva/blob/master/R/fit.R) script from Hooker et al. (2020). Note that there will be a number of modifications from fit.R in the following chunks. There are several intermediate sample collections in that script that are not implemented here (for WAIC calculations, forecasting, etc.). Note also that most of the markdown is shared with the other SCR analyses (*e.g.*, `14_fitHooker`, `15_fitHookerM`, `16_fitHooker_move`, etc.).  
+From here on out, we'll follow along with the [fit.R](https://github.com/rbchan/ga-bear-pva/blob/master/R/fit.R) script from Hooker et al. (2020). Note that there will be a number of modifications from fit.R in the following chunks. There are several intermediate sample collections in that script that are not implemented here (*e.g.,* for forecasting). However, we do use the same basic code to fit the model and for WAIC calculations.  
 ```{r fitRscript}
 ## Fit open population SCR models to central GA black bear data
 ## Female-only analysis
@@ -292,14 +302,12 @@ S[is.na(S)] <- 0
 
 The `NA` entries that caused problems for **JAGS** seem to be only along the periphery of the state space. Seems likely that these crop up because of slightly different positions of the traps which meant that the 4km buffer would've picked up a few additional cells in the raster.  
 
-## Fit the model
-The analysis in **JAGS** is below. First we prepare the data and initial values.  
+# Fit the model - Version 1
+The analysis of the version 1 model (a single rate of recruitment) in **JAGS** is below. First we prepare the data and initial values.  
 
-```{r JAGSprep, crop=NULL}
+```{r JAGSprep1, crop=NULL}
 ## JAGS
-
 library(rjags)
-
 
 
 ### Put the data in a list
@@ -321,7 +329,6 @@ jd <- list(yF=yF, yF.zero=matrix(0, Mf, nYears),
            poly.area=Sarea)
 
 str(jd)
-
 
 
 #### Function to generate initial values
@@ -392,13 +399,14 @@ ji <- function() {
               kappa=runif(2, 0.5, 1),
               psi=matrix(c(runif(2), rep(NA, nYears)), 2, nYears),
               phi=runif(2), #!# Added this, we didn't draw init. phi before?
-              gamma=runif(2, 0.2, 0.3)) 
+              gamma=runif(1, 0.2, 0.3)) 
   out$".RNG.name" <- "base::Mersenne-Twister" 
   out$".RNG.seed" <- sample.int(1e6, 1)
   return(out)
 }
 
 str(ji())
+
 
 ## Visualize initial values of activity centers
 plot(raster(S, xmn=xlim[1], ymn=ylim[1], xmx=xlim[2], ymx=ylim[2]))
@@ -441,9 +449,8 @@ Now to run the MCMC sampler. Note that several steps from the full [fit.R](https
 i. Adaptive phase sampling - 1000 iterations per chain 
 ii. Collect samples from the posterior - 10,000 iterations per chain
 
-```{r JAGSrun, crop=NULL}
+```{r JAGSrun1, crop=NULL}
 ## Models in parallel
-
 library(parallel)
 
 (nCores <- max(1, min(detectCores()-1, 4)))
@@ -455,22 +462,19 @@ clusterExport(cl1, c("jd", "ji", "jp",
                      "first.detF", "last.detF", "first.detM", "last.detM"))
 
 ## Compile and adapt
-
 system.time({
     adapt <- clusterEvalQ(cl1, {
         library(rjags)
         load.module("dic")
         load.module("glm")
-        mod <- jags.model(file="../input/CGA_SCR.jag",
+        mod <- jags.model(file="../input/CGA_SCR_v1.jag",
                          data=jd, inits=ji,
                          n.chains=1, n.adapt=1000) 
         return(mod)
     })
 }) 
 
-save(adapt, file="adapt-bothSexes.gzip")
-
-
+save(adapt, file="adapt-bothSexes_v1.gzip")
 
 
 ## Draw posterior samples, including the latent variables needed
@@ -481,27 +485,57 @@ system.time({
                          variable.names=c(jp, "deviance", 
                                           "zF", "aF", "sF", 
                                           "zM", "aM", "sM"),
-                         n.iter=10000, n.thin=1) 
+                         n.iter=10000, thin=1) 
     return(as.mcmc(mod1))
   })
 })
 
+save(samples, file="samples-bothSexes_v1.gzip")
 
 
-save(samples, file="samples-bothSexes.gzip")
+## WAIC
+waic.out <- clusterEvalQ(cl1, {
+  waic <- jags.samples(model=mod,
+                       variable.names=c("deviance","WAIC"),
+                       n.iter=5000, thin=1, type="mean")
+  return(waic)
+})
 
+save(waic.out, file="waic_bothSexes_v1.gzip")
+
+stopCluster(cl1)
 ```
 
-## Posterior samples
+## Compute WAIC - Version 2
+```{r WAIC2}
+load("waic_bothSexes_v1.gzip")
+
+p_waic_i <- rowMeans(cbind(waic.out[[1]]$WAIC, 
+                           waic.out[[2]]$WAIC, 
+                           waic.out[[3]]$WAIC, 
+                           waic.out[[4]]$WAIC))
+dev_i <- rowMeans(cbind(waic.out[[1]]$deviance, 
+                        waic.out[[2]]$deviance, 
+                        waic.out[[3]]$deviance, 
+                        waic.out[[4]]$deviance))
+
+(WAIC1 <- sum(dev_i) + sum(p_waic_i))
+(p_WAIC1 <- sum(p_waic_i))
+```
+
+The WAIC calculated for the version 1 model is `r round(WAIC1, 1)`.  
+
+
+## Posterior Samples - Version 2
 
 Now to plot a couple of posteriors and save the workspace for further analysis.  
 
-```{r wrapUp, crop=NULL}
+```{r wrapUp1, crop=NULL}
 # Use the jc4.out object for posteriors
 mc1 <- as.mcmc.list(samples)
 
 focal.parms <- c("Nf[1]","Nf[2]","Nm[1]","Nm[2]",
-                 "sigma[1]","sigma[2]","phi[1]","phi[2]","gamma[1]","gamma[2]",
+                 "sigma[1]","sigma[2]","phi[1]","phi[2]","gamma",
                  "lambdaF", "lambdaM", "lambda",
                  "p0st[1,1,1]","p0st[1,1,2]","p0st[1,2,1]","p0st[1,2,2]",
                  "p0st[2,1,1]","p0st[2,1,2]","p0st[2,2,1]","p0st[2,2,2]",
@@ -518,15 +552,16 @@ gelman.diag(mc1[,focal.parms])
 ```
 
 Now plot the posterior distributions for the model parameters
-```{r postPlot, crop=NULL}
+```{r postPlot1, crop=NULL}
 # Plot some posteriors
 for(p in 1:length(focal.parms)) {
   plot(mc1[,focal.parms[p]], main = focal.parms[p])
 }
 ```
 
+## Activity Center Density - Version 1
 Now plot the density of inferred activity centers in the state space...  
-```{r DensHooker, crop=NULL}
+```{r DensHooker1, crop=NULL}
 # Finally the density of activity centers in the study region
 library(scrbook)
 library(raster)
@@ -627,15 +662,370 @@ addscalebar(pos="topleft", htin=0.07, plotepsg =32617,
 
 ---
 
-## Save the workspace
+# Fit the model - Version 2
+The analysis in **JAGS** is below. First we prepare the data and initial values.  
+
+```{r JAGSprep2, crop=NULL}
+## JAGS
+library(rjags)
+
+
+### Put the data in a list
+jd <- list(yF=yF, yF.zero=matrix(0, Mf, nYears),
+           yM=yM, yM.zero=matrix(0, Mm, nYears),
+           zF=zFdata.aug,
+           zM=zMdata.aug,
+           nFem=nFem, nMale=nMale,
+           Mf=Mf, Mm=Mm,
+           nTrapsYr=as.integer(nTrapsYr),
+           nWeeks=nWeeks, nYears=nYears, 
+           oper.traps=oper.traps,
+           prevcapF=prevcap.f+1,
+           prevcapM=prevcap.m+1,
+           S=S, delta=delta,
+           onesF=rep(1, Mf),
+           onesM=rep(1, Mm),
+           x=traps, xlim=xlim, ylim=ylim,
+           poly.area=Sarea)
+
+str(jd)
+
+
+#### Function to generate initial values
+ji <- function() {
+  nFem <- jd$nFem
+  nMale <- jd$nMale
+  Mf <- jd$Mf
+  Mm <- jd$Mm
+  nYears <- jd$nYears
+  nWeeks <- jd$nWeeks
+  traps <- jd$x
+  nTraps <- nrow(traps)
+  
+  #AC and z for Females
+  zFi <- matrix(0, Mf, nYears)
+  sFi1 <- traps[sample.int(nTraps, size=Mf, replace=TRUE,
+                          prob=traps.in),]
+  sFi <- as.matrix(sFi1)
+  for(i in 1:nFem) {
+    zFi[i,first.detF[i]:last.detF[i]] <- NA
+    traplocs.i <- (rowSums(jd$yF[i,,,])>0) * traps.in
+    if(all(!traplocs.i))
+      next
+    sFi[i,] <- colMeans(traps[which(traplocs.i == 1),,drop=FALSE])
+    #Check that the average detection location is in habitat
+    testAC <- 1 == jd$S[round((jd$ylim[2]-sFi[i,2])/jd$delta+0.5),
+                        round((sFi[i,1]-jd$xlim[1])/jd$delta+0.5)]
+    S360hab <- S360dat[which(S360dat$habitat == 1),c("x","y")]
+    if(!testAC) {
+      tmp.dist <- sqrt((S360hab$x-sFi[i,1])^2 + 
+                         (S360hab$y-sFi[i,2])^2)
+      sFi[i,1] <- S360hab$x[which(tmp.dist == min(tmp.dist))]
+      sFi[i,2] <- S360hab$y[which(tmp.dist == min(tmp.dist))]
+      rm(tmp.dist)
+    }
+    rm(testAC)
+  }
+  
+  #AC and z for males
+  zMi <- matrix(0, Mm, nYears)
+  sMi1 <- traps[sample.int(nTraps, size=Mm, replace=TRUE,
+                           prob=traps.in),]
+  sMi <- as.matrix(sMi1)
+  for(i in 1:nMale) {
+    zMi[i,first.detM[i]:last.detM[i]] <- NA
+    traplocs.i <- (rowSums(jd$yM[i,,,])>0) * traps.in
+    if(all(!traplocs.i))
+      next
+    sMi[i,] <- colMeans(traps[which(traplocs.i == 1),,drop=FALSE])
+    #Check that the average detection location is in habitat
+    testAC <- 1 == jd$S[round((jd$ylim[2]-sMi[i,2])/jd$delta+0.5),
+                        round((sMi[i,1]-jd$xlim[1])/jd$delta+0.5)]
+    S360hab <- S360dat[which(S360dat$habitat == 1),c("x","y")]
+    if(!testAC) {
+      tmp.dist <- sqrt((S360hab$x-sMi[i,1])^2 + 
+                         (S360hab$y-sMi[i,2])^2)
+      sMi[i,1] <- S360hab$x[which(tmp.dist == min(tmp.dist))]
+      sMi[i,2] <- S360hab$y[which(tmp.dist == min(tmp.dist))]
+      rm(tmp.dist)
+    }
+    rm(testAC)
+  }
+
+  p0i <- array(NA, c(2, nYears, 2))
+  p0i[,,2] <- matrix(runif(2*nYears), 2, nYears)
+  out <- list(zF=zFi, zM=zMi, sF=sFi, sM=sMi, p0st=p0i, 
+              sigma=runif(2, 3000, 4000), 
+              kappa=runif(2, 0.5, 1),
+              psi=matrix(c(runif(2), rep(NA, nYears)), 2, nYears),
+              phi=runif(2), #!# Added this, we didn't draw init. phi before?
+              gamma=runif(2, 0.2, 0.3)) 
+  out$".RNG.name" <- "base::Mersenne-Twister" 
+  out$".RNG.seed" <- sample.int(1e6, 1)
+  return(out)
+}
+
+str(ji())
+
+
+## Visualize initial values of activity centers
+plot(raster(S, xmn=xlim[1], ymn=ylim[1], xmx=xlim[2], ymx=ylim[2]))
+points(ji()$sF, pch = 1, cex = 0.5, col = "pink")
+points(ji()$sM, pch= 1, cex = 0.5, col = "lightblue")
+rect(xlim[1], ylim[1], xlim[2], ylim[2], border="blue")
+
+
+##Focus in on a few individuals with multiple detections
+# is ji() placing initial activity centers in the right places?
+par(mar = c(3,3,3,3))
+closer.look <- which(rowSums(jd$yF) > 5)
+for(i in closer.look) {
+  tmp.s <- ji()$sF[i,]
+  plot(raster(S, xmn=xlim[1], ymn=ylim[1], xmx=xlim[2], ymx=ylim[2]), 
+       main = paste0 ("Female ",i, " - ", "Clone ", Fch$clone[i]), 
+       legend =FALSE)
+  mtext(text = paste("Total Detections =", sum(jd$yF[i,,,])))
+  points(traps, pch = 3, col = "red", cex = 0.5)
+  points(jd$x[which(rowSums(jd$yF[i,,,]) > 0),], pch = 8, col = "blue", cex = 1.2)
+  points(x=tmp.s[1], y=tmp.s[2], pch = 17, col = "grey")
+  legend("topleft", bty = "n", pch = c(15, 3, 8, 17), cex = 0.75,
+         col = c(terrain.colors(10)[1],"red","blue","grey"),
+         legend=c("state space", "snares","detections","initial AC"))
+  rm(tmp.s)
+}
+
+
+#### Parameters to monitor
+jp <- c("p0st", "sigma", "kappa", "gamma", "phi", "psi",
+        "EN", "N", "ENf", "Nf", "ENm", "Nm", "Ntotal", "totF", "totM",
+        "ED", "RD", "EDf", "RDf", "EDm", "RDm",
+        "survivingF", "survivingM", "recruitF", "recruitM",
+        "lambdaF", "lambdaM", "lambda")
+
+```
+
+Now to run the MCMC sampler. Note that several steps from the full [fit.R](https://github.com/rbchan/ga-bear-pva/blob/master/R/fit.R) script from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) were skipped below. These steps involved calculation of WAIC or recording information needed for forecasting future population sizes under the model. Here, we simplify to two steps:
+
+i. Adaptive phase sampling - 1000 iterations per chain 
+ii. Collect samples from the posterior - 10,000 iterations per chain
+
+```{r JAGSrun2, crop=NULL}
+## Models in parallel
+library(parallel)
+
+(nCores <- max(1, min(detectCores()-1, 4)))
+
+cl1 <- makeCluster(nCores)
+
+clusterExport(cl1, c("jd", "ji", "jp",
+                     "traps.in", "S360dat",
+                     "first.detF", "last.detF", "first.detM", "last.detM"))
+
+## Compile and adapt
+system.time({
+    adapt <- clusterEvalQ(cl1, {
+        library(rjags)
+        load.module("dic")
+        load.module("glm")
+        mod <- jags.model(file="../input/CGA_SCR_v2.jag",
+                         data=jd, inits=ji,
+                         n.chains=1, n.adapt=1000) 
+        return(mod)
+    })
+}) 
+
+save(adapt, file="adapt-bothSexes_v2.gzip")
+
+
+## Draw posterior samples, including the latent variables needed
+## for forecasting
+system.time({
+  samples <- clusterEvalQ(cl1, {
+    mod1 <- coda.samples(model=mod,
+                         variable.names=c(jp, "deviance", 
+                                          "zF", "aF", "sF", 
+                                          "zM", "aM", "sM"),
+                         n.iter=10000, thin=1) 
+    return(as.mcmc(mod1))
+  })
+})
+
+save(samples, file="samples-bothSexes_v2.gzip")
+
+
+## WAIC
+waic.out <- clusterEvalQ(cl1, {
+  waic <- jags.samples(model=mod,
+                       variable.names=c("deviance","WAIC"),
+                       n.iter=5000, thin=1, type="mean")
+  return(waic)
+})
+
+save(waic.out, file="waic_bothSexes_v2.gzip")
+
+stopCluster(cl1)
+```
+
+## Compute WAIC - Version 2
+```{r WAIC2}
+load("waic_bothSexes_v2.gzip")
+
+p_waic_i <- rowMeans(cbind(waic.out[[1]]$WAIC, 
+                           waic.out[[2]]$WAIC, 
+                           waic.out[[3]]$WAIC, 
+                           waic.out[[4]]$WAIC))
+dev_i <- rowMeans(cbind(waic.out[[1]]$deviance, 
+                        waic.out[[2]]$deviance, 
+                        waic.out[[3]]$deviance, 
+                        waic.out[[4]]$deviance))
+
+(WAIC2 <- sum(dev_i) + sum(p_waic_i))
+(p_WAIC2 <- sum(p_waic_i))
+```
+
+The WAIC calculated for the version 2 model is `r round(WAIC2, 1)`.  
+
+## Posterior Samples - Version 2
+Now to plot a couple of posteriors and save the workspace for further analysis.  
+
+```{r wrapUp2, crop=NULL}
+# Use the jc4.out object for posteriors
+mc1 <- as.mcmc.list(samples)
+
+focal.parms <- c("Nf[1]","Nf[2]","Nm[1]","Nm[2]",
+                 "sigma[1]","sigma[2]","phi[1]","phi[2]","gamma[1]","gamma[2]",
+                 "lambdaF", "lambdaM", "lambda",
+                 "p0st[1,1,1]","p0st[1,1,2]","p0st[1,2,1]","p0st[1,2,2]",
+                 "p0st[2,1,1]","p0st[2,1,2]","p0st[2,2,1]","p0st[2,2,2]",
+                 "kappa[1]","kappa[2]")
+
+# Posterior summary
+summary(mc1[,focal.parms])
+
+# Check ESS
+effectiveSize(mc1[,focal.parms])
+
+# Check Rhat
+gelman.diag(mc1[,focal.parms])
+```
+
+Now plot the posterior distributions for the model parameters
+```{r postPlot2, crop=NULL}
+# Plot some posteriors
+for(p in 1:length(focal.parms)) {
+  plot(mc1[,focal.parms[p]], main = focal.parms[p])
+}
+```
+
+## Activity Center Density - Version 2
+Now plot the density of inferred activity centers in the state space...  
+```{r DensHooker2, crop=NULL}
+# Finally the density of activity centers in the study region
+library(scrbook)
+library(raster)
+library(sf)
+library(usmap)
+library(prettymapr)
+
+# Slightly modified plotting function
+# See scrbook::SCRdensity() for the original
+mySCRdensity <- function (obj, nx = 30, ny = 30, Xl = NULL, Xu = NULL, Yl = NULL, 
+    Yu = NULL, scalein = 100, scaleout = 100, col = "gray", ncolors = 10, 
+    whichguy = NULL) {
+    Sxout <- obj$Sx
+    Syout <- obj$Sy
+    z <- obj$z
+    niter <- nrow(z)
+    if (is.null(Xl)) {
+        Xl <- min(Sxout) * 0.999
+        Xu <- max(Sxout) * 1.001
+        Yl <- min(Syout) * 0.999
+        Yu <- max(Syout) * 1.001
+    }
+    xg <- seq(Xl, Xu, , nx)
+    yg <- seq(Yl, Yu, , ny)
+    guy <- col(Sxout)
+    Sxout <- cut(Sxout[z == 1], breaks = xg)
+    Syout <- cut(Syout[z == 1], breaks = yg)
+    if (is.null(whichguy)) {
+        Dn <- table(Sxout, Syout)/niter
+        area <- (yg[2] - yg[1]) * (xg[2] - xg[1]) * scalein
+        Dn <- (Dn/area) * scaleout
+    }
+    else {
+        Dn <- table(Sxout[guy == whichguy], Syout[guy == whichguy])/niter
+    }
+    Dn[Dn == 0] <- NA
+    #cat("mean: ", mean(Dn), fill = TRUE)
+    par(mar = c(3, 3, 3, 6))
+    if (col == "gray") {
+        cc <- seq(3, 17, , 10)/20
+        cc <- rev(gray(cc))
+    }
+    else cc <- RColorBrewer::brewer.pal(9, "OrRd")[-1]
+    image(xg, yg, Dn, col = cc)
+    image.scale(Dn, col = cc)
+    box()
+    #return(list(grid = cbind(xg, yg), Dn = Dn))
+}
+
+gamap <- us_map(regions="counties", include="GA")
+gamap <- st_transform(gamap, crs=4326) #Convert to WGS84
+gamap_utm <- st_transform(gamap, crs=32617) #Convert to UTM
+
+
+# Females
+mat.out <- as.matrix(mc1)
+M <- Mf
+allS <- mat.out[,grep("sF[", colnames(mat.out), fixed=TRUE)[1:(M*2)]]
+Sx <- allS[,grep(",1]", colnames(allS), fixed=TRUE)]
+Sy <- allS[,grep(",2]", colnames(allS), fixed=TRUE)]
+z <- mat.out[,grep("zF[", colnames(mat.out), fixed=TRUE)[1:M]]
+obj <- list(Sx=Sx, Sy=Sy, z=z)
+
+#Input coordinates are in m, output in ind/km^2 (i.e., 1e6=1000*1000)
+mySCRdensity(obj, scalein=1, scaleout=1e6, col = "terrain", 
+           Xl=xlim0[1],
+           Xu=xlim0[2],
+           Yl=ylim0[1],
+           Yu=ylim0[2],
+           ncolors=10)
+plot(st_geometry(gamap_utm), add=TRUE, lwd = 0.25)
+addnortharrow("topright", scale = 0.4)
+addscalebar(pos="topleft", htin=0.07, plotepsg =32617, 
+            widthhint = 0.2, label.cex = 0.6)
+
+
+# Males
+mat.out <- as.matrix(mc1)
+M <- Mm
+allS <- mat.out[,grep("sM[", colnames(mat.out), fixed=TRUE)[1:(M*2)]]
+Sx <- allS[,grep(",1]", colnames(allS), fixed=TRUE)]
+Sy <- allS[,grep(",2]", colnames(allS), fixed=TRUE)]
+z <- mat.out[,grep("zM[", colnames(mat.out), fixed=TRUE)[1:M]]
+obj <- list(Sx=Sx, Sy=Sy, z=z)
+
+#Input coordinates are in m, output in ind/km^2 (i.e., 1e6=1000*1000)
+mySCRdensity(obj, scalein=1, scaleout=1e6, col = "terrain", 
+           Xl=xlim0[1],
+           Xu=xlim0[2],
+           Yl=ylim0[1],
+           Yu=ylim0[2],
+           ncolors=10)
+plot(st_geometry(gamap_utm), add=TRUE, lwd = 0.25)
+addnortharrow("topright", scale = 0.4)
+addscalebar(pos="topleft", htin=0.07, plotepsg =32617, 
+            widthhint = 0.2, label.cex = 0.6)
+```
+
+
+---
+
+# Save the workspace
 
 Save the workspace and quit
 ```{r saveQuit}
-# Save the mcmc lists as an Rda file
-save(mc1, file="mc1-bothSexes.Rda")
-
 # Save the entire workspace
 save.image(file="Hooker_bothSexes.Rws")
-
 ```
 
