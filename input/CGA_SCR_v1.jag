@@ -6,6 +6,7 @@ model {
 		kappa[sx] ~ dbeta(1,1) #behavioral effect of capture
 		phi[sx] ~ dbeta(1,1) #survival
 		sigma[sx] ~ dgamma(0.01, 0.01) #decay of det. prob. with dist.
+		#gamma[sx] ~ dunif(0,1) #recruitment (different rates for sexes)
 				
 		#year- and sex-specific parameters
 		for(t in 1:nYears) {
@@ -26,6 +27,8 @@ model {
 		#expected male and female recruits
 		ERf[t] <- Nf[t-1]*gamma 
 		ERm[t] <- Nf[t-1]*gamma
+		#ERf[t] <- Nf[t-1]*gamma[1] 
+		#ERm[t] <- Nf[t-1]*gamma[2]
 		ER[t] <- ERf[t]+ERm[t]
 
 		#data augmentation for future years
