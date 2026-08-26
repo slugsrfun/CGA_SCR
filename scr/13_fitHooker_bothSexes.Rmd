@@ -305,6 +305,7 @@ The `NA` entries that caused problems for **JAGS** seem to be only along the per
 # Fit the model - Version 1
 The analysis of the version 1 model (a single rate of recruitment) in **JAGS** is below. First we prepare the data and initial values.  
 
+## Prepare Data - Verson 1
 ```{r JAGSprep1, crop=NULL}
 ## JAGS
 library(rjags)
@@ -501,14 +502,14 @@ waic.out <- clusterEvalQ(cl1, {
   return(waic)
 })
 
-save(waic.out, file="waic_bothSexes_v1.gzip")
+save(waic.out, file="waic-bothSexes_v1.gzip")
 
 stopCluster(cl1)
 ```
 
 ## Compute WAIC - Version 1
 ```{r WAIC1}
-load("waic_bothSexes_v1.gzip")
+load("waic-bothSexes_v1.gzip")
 
 p_waic_i <- rowMeans(cbind(waic.out[[1]]$WAIC, 
                            waic.out[[2]]$WAIC, 
@@ -526,8 +527,7 @@ dev_i <- rowMeans(cbind(waic.out[[1]]$deviance,
 The WAIC calculated for the version 1 model is `r round(WAIC1, 1)`.  
 
 
-## Posterior Samples - Version 2
-
+## Posterior Samples - Version 1
 Now to plot a couple of posteriors and save the workspace for further analysis.  
 
 ```{r wrapUp1, crop=NULL}
@@ -665,6 +665,7 @@ addscalebar(pos="topleft", htin=0.07, plotepsg =32617,
 # Fit the model - Version 2
 The analysis in **JAGS** is below. First we prepare the data and initial values.  
 
+## Prepare Data - Verson 2
 ```{r JAGSprep2, crop=NULL}
 ## JAGS
 library(rjags)
@@ -861,14 +862,14 @@ waic.out <- clusterEvalQ(cl1, {
   return(waic)
 })
 
-save(waic.out, file="waic_bothSexes_v2.gzip")
+save(waic.out, file="waic-bothSexes_v2.gzip")
 
 stopCluster(cl1)
 ```
 
 ## Compute WAIC - Version 2
 ```{r WAIC2}
-load("waic_bothSexes_v2.gzip")
+load("waic-bothSexes_v2.gzip")
 
 p_waic_i <- rowMeans(cbind(waic.out[[1]]$WAIC, 
                            waic.out[[2]]$WAIC, 
