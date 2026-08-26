@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=64gb
-#SBATCH --time=96:00:00
+#SBATCH --time=60:00:00
 #SBATCH --output=/scratch/jdrobins/CGA_SCR/scr/fitHooker_bothSexes.o
 #SBATCH --error=/scratch/jdrobins/CGA_SCR/scr/fitHooker_bothSexes.o
 
