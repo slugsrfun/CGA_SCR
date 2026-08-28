@@ -243,7 +243,7 @@ model {
 					ld.yM.ijkt[i,j,k,t] <- logdensity.bin(yM[i,j,k,t], EyM[i,j,k,t], 1)
 				}
 			}
-			ld.yM.it[i] <- sum(ld.yM.ijkt[i,oper.traps[1:nTrapsYr[t],t],,t])
+			ld.yM.it[i,t] <- sum(ld.yM.ijkt[i,oper.traps[1:nTrapsYr[t],t],,t])
 		}
 		ld.yM[i] <- sum(ld.yM.it[i,])
 	}
