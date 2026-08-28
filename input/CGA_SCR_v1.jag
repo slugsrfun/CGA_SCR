@@ -196,4 +196,74 @@ model {
 		lambdaM <- Nm[t]/max(Nm[t-1], 0.1)
 		lambda <- N[t]/max(N[t-1], 0.1)
 	}
+
+
+
+	#Log densities - for WAIC
+	#Females
+	#ld.y - observed females
+	for(i in 1:nFem) {
+		for(t in 1:nYears) {
+			for(j in oper.traps[1:nTrapsYr[t],t]) {
+				for(k in 1:nWeeks) {
+					ld.yF.ijkt[i,j,k,t] <- logdensity.bin(yF[i,j,k,t], EyF[i,j,k,t], 1)
+				}
+			}
+		}
+		ld.yF[i] <- sum(ld.yF.ijkt[i,,,])
+	}
+
+	#ld.y - augmented females
+	for(i in (nFem+1):Mf) {
+		for(t in 1:nYears) {
+			ld.yF.noDet[i,t] <- logdensity.bin(yF.zero[i,t], prDetF[i,t], 1)
+		}
+		ld.yF[i] <- sum(ld.yF.noDet[i,])
+	}
+
+	for(i in 1:Mf) {
+		#ld.z - year 1
+		ld.zF.it[i,1] <- logdensity.bin(zF[i,1], psi[1,1], 1)
+		#ld.z - year 2
+		ld.zF.it[i,2] <- logdensity.bin(zF[i,2], EzF[i,2], 1)
+		#ld.z - combined
+		ld.zF[i] <- ld.zF.it[i,1] + ld.zF.it[i,2]
+
+		#ld.F - combine ld.yF and ld.zF (monitor for WAIC)
+		ld.F[i] <- ld.yF[i] + ld.zF[i]
+	}
+
+	#Males
+	#ld.y - observed males
+	for(i in 1:nMale) {
+		for(t in 1:nYears) {
+			for(j in oper.traps[1:nTrapsYr[t],t]) {
+				for(k in 1:nWeeks) {
+					ld.yM.ijkt[i,j,k,t] <- logdensity.bin(yM[i,j,k,t], EyM[i,j,k,t], 1)
+				}
+			}
+		}
+		ld.yM[i] <- sum(ld.yM.ijkt[i,,,])
+	}
+
+	#ld.y - augmented males
+	for(i in (nMale+1):Mm) {
+		for(t in 1:nYears) {
+			ld.yM.noDet[i,t] <- logdensity.bin(yM.zero[i,t], prDetM[i,t], 1)
+		}
+		ld.yM[i] <- sum(ld.yM.noDet[i,])
+	}
+
+	for(i in 1:Mm) {
+		#ld.z - year 1
+		ld.zM.it[i,1] <- logdensity.bin(zM[i,1], psi[2,1], 1)
+		#ld.z - year 2
+		ld.zM.it[i,2] <- logdensity.bin(zM[i,2], EzM[i,2], 1)
+		#ld.z - combined
+		ld.zM[i] <- ld.zM.it[i,1] + ld.zM.it[i,2]
+
+		#ld.M - combine ld.yM and ld.zM (monitor for WAIC)
+		ld.M[i] <- ld.yM[i] + ld.zM[i]
+	}
+
 }
