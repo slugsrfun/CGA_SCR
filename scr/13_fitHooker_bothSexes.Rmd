@@ -495,14 +495,16 @@ save(samples, file="samples-bothSexes_v1.gzip")
 
 
 ## WAIC
-waic.out <- clusterEvalQ(cl1, {
-  waic <- jags.samples(model=mod,
-                       variable.names=c("deviance","WAIC"),
-                       n.iter=5000, thin=1, type="mean")
-  return(waic)
+system.time({
+  waic.out1 <- clusterEvalQ(cl1, {
+    waic1 <- coda.samples(model = mod,
+                         variable.names = c("ld.F","ld.M"),
+                         n.iter = 5000, thin = 1)
+    return(waic1)
+  })
 })
 
-save(waic.out, file="waic-bothSexes_v1.gzip")
+save(waic.out1, file = "waic-bothSexes_v1.gzip")
 
 stopCluster(cl1)
 ```
@@ -511,17 +513,16 @@ stopCluster(cl1)
 ```{r WAIC1}
 load("waic-bothSexes_v1.gzip")
 
-p_waic_i <- rowMeans(cbind(waic.out[[1]]$WAIC, 
-                           waic.out[[2]]$WAIC, 
-                           waic.out[[3]]$WAIC, 
-                           waic.out[[4]]$WAIC))
-dev_i <- rowMeans(cbind(waic.out[[1]]$deviance, 
-                        waic.out[[2]]$deviance, 
-                        waic.out[[3]]$deviance, 
-                        waic.out[[4]]$deviance))
+vars <- coda::varnames(waic.out1[[1]])
+ld.samples <- rbind(as.matrix(waic.out1[[1]][,grep("ld.", vars)]),
+                    as.matrix(waic.out1[[2]][,grep("ld.", vars)]),
+                    as.matrix(waic.out1[[3]][,grep("ld.", vars)]),
+                    as.matrix(waic.out1[[4]][,grep("ld.", vars)]))
+lppd <- sum(log(colMeans(exp(ld.samples))))
+(penalty1 <- sum(apply(ld.samples, 2, var)))
+(WAIC1 <- -2*(lppd-penalty1))
 
-(WAIC1 <- sum(dev_i) + sum(p_waic_i))
-(p_WAIC1 <- sum(p_waic_i))
+rm(vars, ld.samples, lppd)
 ```
 
 The WAIC calculated for the version 1 model is `r round(WAIC1, 1)`.  
@@ -855,14 +856,16 @@ save(samples, file="samples-bothSexes_v2.gzip")
 
 
 ## WAIC
-waic.out <- clusterEvalQ(cl1, {
-  waic <- jags.samples(model=mod,
-                       variable.names=c("deviance","WAIC"),
-                       n.iter=5000, thin=1, type="mean")
-  return(waic)
+system.time({
+  waic.out2 <- clusterEvalQ(cl1, {
+    waic2 <- coda.samples(model = mod,
+                         variable.names = c("ld.F","ld.M"),
+                         n.iter = 5000, thin = 1)
+    return(waic2)
+  })
 })
 
-save(waic.out, file="waic-bothSexes_v2.gzip")
+save(waic.out2, file = "waic-bothSexes_v2.gzip")
 
 stopCluster(cl1)
 ```
@@ -871,17 +874,16 @@ stopCluster(cl1)
 ```{r WAIC2}
 load("waic-bothSexes_v2.gzip")
 
-p_waic_i <- rowMeans(cbind(waic.out[[1]]$WAIC, 
-                           waic.out[[2]]$WAIC, 
-                           waic.out[[3]]$WAIC, 
-                           waic.out[[4]]$WAIC))
-dev_i <- rowMeans(cbind(waic.out[[1]]$deviance, 
-                        waic.out[[2]]$deviance, 
-                        waic.out[[3]]$deviance, 
-                        waic.out[[4]]$deviance))
+vars <- coda::varnames(waic.out2[[1]])
+ld.samples <- rbind(as.matrix(waic.out2[[1]][,grep("ld.", vars)]),
+                    as.matrix(waic.out2[[2]][,grep("ld.", vars)]),
+                    as.matrix(waic.out2[[3]][,grep("ld.", vars)]),
+                    as.matrix(waic.out2[[4]][,grep("ld.", vars)]))
+lppd <- sum(log(colMeans(exp(ld.samples))))
+(penalty2 <- sum(apply(ld.samples, 2, var)))
+(WAIC2 <- -2*(lppd-penalty2))
 
-(WAIC2 <- sum(dev_i) + sum(p_waic_i))
-(p_WAIC2 <- sum(p_waic_i))
+rm(vars, ld.samples, lppd)
 ```
 
 The WAIC calculated for the version 2 model is `r round(WAIC2, 1)`.  
