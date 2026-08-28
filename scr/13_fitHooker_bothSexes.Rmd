@@ -286,17 +286,13 @@ plot(raster(S))
 sum(S, na.rm=TRUE)*delta^2 / 1e6
 Sarea <- sum(S, na.rm=TRUE)*delta^2 / 1e6
 
-#!# Where are these NA values??
+# Where are these NA values??
 Stmp <- S
 Stmp[is.na(Stmp)] <- 500
 plot(raster(Stmp))
 
-#!# These appear to be points outside of the polygon assessed for habitat
-#!# In the Hooker et al. (2020) study
-#!# There are relatively few of these, and they are on the periphery of S
-#!# Better to assume they're NOT habitat than to assume that they are
-
-#!# Need to recode them to 0's or 1's for this to run #!#
+# Better to assume they're NOT habitat than to assume that they are
+# Recode them to 0's
 S[is.na(S)] <- 0
 ```
 
