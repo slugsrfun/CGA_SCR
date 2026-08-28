@@ -209,8 +209,9 @@ model {
 					ld.yF.ijkt[i,j,k,t] <- logdensity.bin(yF[i,j,k,t], EyF[i,j,k,t], 1)
 				}
 			}
+			ld.yF.it[i,t] <- sum(ld.yF.ijkt[i,oper.traps[1:nTrapsYr[t],t],,t])
 		}
-		ld.yF[i] <- sum(ld.yF.ijkt[i,,,])
+		ld.yF[i] <- sum(ld.yF.it[i,])
 	}
 
 	#ld.y - augmented females
@@ -242,8 +243,9 @@ model {
 					ld.yM.ijkt[i,j,k,t] <- logdensity.bin(yM[i,j,k,t], EyM[i,j,k,t], 1)
 				}
 			}
+			ld.yM.it[i] <- sum(ld.yM.ijkt[i,oper.traps[1:nTrapsYr[t],t],,t])
 		}
-		ld.yM[i] <- sum(ld.yM.ijkt[i,,,])
+		ld.yM[i] <- sum(ld.yM.it[i,])
 	}
 
 	#ld.y - augmented males
