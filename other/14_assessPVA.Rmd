@@ -9,34 +9,38 @@ linkcolor: blue
 ---
 
 # Background
-[Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) used noninvasive sampling and spatial capture-recapture models to estimate the abundance of female black bears in central Georgia. Their analysis yielded point estimates of $N_t$ between 106 and 166 using samples collected between 2012 and 2016. Using the parameterized model, Hooker et al. (2020) also conducted population viability analyses (PVA) for the central GA black bear population. They projected abundance 50 years into the future using survival and density-dependent recruitment rates under management scenarios where a Poisson-distributed number of additional females (above current levels) were removed from the population by harvest. They evaluated *status quo* simulations (no additional harvest) and four alternatives where the mean of the Poisson was set to $h=5$, 10, 15, or 20 females (above *status quo* levels) were removed from the population by harvest. They found that 50-year extinction risk remained <1% in both the *status quo* and $h=5$ simulations (see Figure 6 of [Hooker et al. 2020](https://doi.org/10.1002/jwmg.21887)).  
+[Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) used noninvasive sampling and spatial capture-recapture models to estimate the abundance of female black bears in central Georgia. Their analysis yielded point estimates of $N_t$ between 106 and 166 using samples collected between 2012 and 2016. Using the same model, Hooker et al. (2020) also conducted population viability analyses (PVA) for the central GA black bear population. They projected abundance 50 years into the future using survival and density-dependent recruitment rates under management scenarios where a Poisson-distributed number of additional females (above current levels) were removed from the population by harvest. They evaluated *status quo* simulations (no additional harvest) and four alternatives where an average of $h=5$, 10, 15, or 20 females (above *status quo* levels) were removed from the population by harvest. They found that 50-year extinction risk remained <1% in both the *status quo* and $h=5$ simulations (see Figure 6 of [Hooker et al. 2020](https://doi.org/10.1002/jwmg.21887)).  
 
 In this markdown, we will revisit predictions from these simulations and use data for *known* female mortalities (which likely underestimates total mortality) to assess i) which scenario considered in the PVA from Hooker et al. (2020) is most similar to the recent past in central GA? and ii) which scenario do estimates of abundance from the present study (see `13_fitHooker_bothSexes`) align with most closely?  
+For the latter comparison, we'll use estimates from the single $\gamma$ model, which estimates more realistic increases in female abundance between 2023 and 2024.  
 
 This markdown will cover the following analyses:
 
 i. Characterize observed mortality levels in central Georgia (for comparison to alternative scenarios considered in Hooker et al. (2020))
 ii. Refit the Hooker et al. (2020) model to the capture history from that study (using scripts and data from the project's [GitHub repository](https://github.com/rbchan/ga-bear-pva))
 iii. Repeat the PVA forecasting simulations from Hooker et al. (2020) with $h=0$, 5, 10, 15, and 20 (as in the original paper), again using scripts from their study
-iv. Compare abundance forecasts from scenarios considered in Hooker et al. (2020) to posterior distributions of female abundance from the SCR model fit in this study
+iv. Compare abundance forecasts from scenarios considered in Hooker et al. (2020) to posterior distributions of female abundance from the SCR model fit in this study ("v1" model, no sex-specific recruitment)
 
 ---
 
-# Observed mortalities in central Georgia
-The Georgia Department of Natural Resources retains records of central GA black bear mortalities due to legal harvest, illegal take, and vehicular collisions. We will use those records to:
+# Observed mortality in central Georgia
+The Georgia Department of Natural Resources retains records of central GA black bear mortality from various sources (*e.g.*, legal harvest, illegal take, vehicular collisions, etc.). We will use those records to:
 
 i. Visualize trends in mortality from these sources over time
-ii. Calculate average numbers of deaths for several time windows
+ii. Calculate average numbers of deaths for three time windows
     + pre-2012: before the Hooker et al. (2020) study period
     + 2012-2016: the Hooker et al. (2020) study period, corresponding most closely to rates in their PVA
     + 2017-2024: prior to, and including, the current study period
-iii. Assess predictions from the PVA in Hooker et al. (2020), given female abundance estimates from our model (`14_fitHooker`) and observed female mortalities
+iii. Assess predictions from the PVA in Hooker et al. (2020), given female abundance estimates from our model (`13_fitHooker_bothSexes`) and observed female mortaly data
 
 ## Dataset
-First load the dataset. The `.csv` file in the repository transposes data from [this spreadsheet](https://docs.google.com/spreadsheets/d/1yB5SA1m_o_DdZ2nwu5-eu565oiii7jqk/edit?usp=sharing&ouid=108908384617619788254&rtpof=true&sd=true) (see the `CGA Trends` tab). Below, we read the data into R, and create subsets for the two sexes and the different sources of mortality.  
+First load the dataset. The `.csv` file in the repository transposes data from [this spreadsheet](https://docs.google.com/spreadsheets/d/1yB5SA1m_o_DdZ2nwu5-eu565oiii7jqk/edit?usp=sharing&ouid=108908384617619788254&rtpof=true&sd=true) (see the `CGA Trends` tab). Below, we read the data into R, and create subsets for the two sexes and the different sources of mortality. Note that data from 2025 were not complete at the time this spreadsheet was created, so we focus on the period between 2003 and 2024.  
 ```{r loadData}
 mort <- read.csv("../input/CGAmortalities.csv", header = TRUE)
 mort
+
+#2025 was a partial year in this dataset, remove it
+mort <- mort[-which(mort$year == 2025),]
 
 #total mortality by sex
 total.male <- rowSums(mort[,which(colnames(mort) %in% c("harvestM",
@@ -51,7 +55,7 @@ all.mort <- data.frame(year = mort$year,
                         harvest = mort$harvestM+mort$harvestF+mort$harvestU,
                         illegal = mort$illegalM+mort$illegalF+mort$illegalU,
                         road = mort$roadM+mort$roadF+mort$roadU)
-total.all <- rowSums(all.mort[,-1])
+(total.all <- rowSums(all.mort[,-1]))
 ```
 
 ## Visualize trends
@@ -85,7 +89,6 @@ legend("topleft", cex = 0.75, bty="n",
 
 #As an area chart
 library(areaplot)
-?areaplot()
 areaplot(x=mort$year,
          y=all.mort[,-1],
          col=color.pal[2:4],
@@ -218,9 +221,9 @@ From the quick comparisons above, it appears that total mortality is indeed high
 
 
 ## Average mortality numbers 
-To compare our abundance estimates to the predictions from simulations in Hooker et al. (2020), we first need to characterize the average total mortalities for a few different periods. This way we can identify the scenario that most closely matches the known mortality data since the period covered by the Hooker et al. (2020) analysis.  
+To compare our abundance estimates to the predictions from simulations in Hooker et al. (2020), we first need to characterize the average total mortality for a few different periods. This way we can identify the scenario that most closely matches the data since the period covered by the Hooker et al. (2020) analysis.  
 
-### Pre 2012
+### Pre-2012
 These numbers won't be directly used, they're included only for the sake of completeness.  
 ```{r preHooker}
 #Combined
@@ -258,7 +261,7 @@ mean(total.male[which(mort$year %in% c(2012:2016))])
 median(total.male[which(mort$year %in% c(2012:2016))])
 ```
 
-### 2016-2024
+### 2017-2024
 And for the period since the Hooker study...  
 ```{r postHooker}
 #Combined
@@ -307,7 +310,7 @@ median(total.female[which(mort$year %in% c(2012:2016))]) -
 mean(total.female[which(mort$year %in% c(2012:2016))]) - 
   total.female[which(mort$year %in% c(2017:2024))]
 median(total.female[which(mort$year %in% c(2012:2016))]) -
-  total.female[which(mort$year %in% c(2017:2024))] -
+  total.female[which(mort$year %in% c(2017:2024))] 
   
 
 #Individual sources
@@ -326,7 +329,7 @@ median(mort$roadF[which(mort$year %in% c(2012:2016))]) -
 
 ```
 
-In fact, mean and median female mortality numbers since 2017 are lower than they were during the Hooker et al. (2020) study period. The *maximum* single year total mortality of females since the Hooker et al. (2020) study is **`r abs(mean(total.female[which(mort$year %in% c(2012:2016))]) - max(total.female[which(mort$year %in% c(2017:2024))]))` bears** above the mean for their study period. That being said, annual female mortality since 2017 has exceeded the average from the Hooker et al. (2020) study period in `r sum(total.female[which(mort$year %in% c(2017:2024))] > mean(total.female[which(mort$year %in% c(2012:2016))]))` years (the last years considered, 2021-2024).  
+In fact, mean and median female mortality numbers since 2017 are lower than they were during the Hooker et al. (2020) study period. The *maximum* single year total mortality of females since the Hooker et al. (2020) study is **`r abs(mean(total.female[which(mort$year %in% c(2012:2016))]) - max(total.female[which(mort$year %in% c(2017:2024))]))` bears** above the mean for their study period. Notably, annual female mortality since 2017 has exceeded the average from the Hooker et al. (2020) study period in `r sum(total.female[which(mort$year %in% c(2017:2024))] > mean(total.female[which(mort$year %in% c(2012:2016))]))` years (the last years considered, 2021-2024).  
 ```{r plotTotVHooker}
 plot(total.female[which(mort$year < 2025)] ~ mort$year[which(mort$year < 2025)], 
      type = "b", lwd = 1, col="black", pch=19, 
@@ -349,14 +352,14 @@ total.female[which(mort$year %in% c(2021:2024))] -
   mean(total.female[which(mort$year %in% c(2012:2016))])
 ```
 
-In terms of the two major sources of mortality, average legal harvests since 2017 are down by `r mean(mort$harvestF[which(mort$year %in% c(2012:2016))]) - mean(mort$harvestF[which(mort$year %in% c(2017:2024))])` females, while average vehicular collision mortalities are up by `r abs(mean(mort$roadF[which(mort$year %in% c(2012:2016))]) - mean(mort$roadF[which(mort$year %in% c(2017:2024))]))` females.  
+In terms of the two major sources of mortality, average legal harvests since 2017 are down by `r mean(mort$harvestF[which(mort$year %in% c(2012:2016))]) - mean(mort$harvestF[which(mort$year %in% c(2017:2024))])` females, while average vehicular collisions are up by `r abs(mean(mort$roadF[which(mort$year %in% c(2012:2016))]) - mean(mort$roadF[which(mort$year %in% c(2017:2024))]))` females.  
 
 ---
 
 # Assess PVA predictions
-Given the female mortalities observed since the Hooker et al. (2020) study period, and the lower mean annual harvest numbers, management of the central GA black bear harvest has been effective at limiting annual female mortality.  
+Given the female mortality observed since the Hooker et al. (2020) study period, and the lower mean annual harvest numbers, management of the central GA black bear harvest has been effective at limiting annual female mortality.  
 
-The average total *known* female mortality since the Hooker et al. (2020) study (`r mean(total.female[which(mort$year %in% c(2017:2024))])`) was below the average total mortality from the Hooker et al. (2020) study period (`r mean(total.female[which(mort$year %in% c(2012:2016))])`), while the maximum single-year mortality since 2016 (`r max(total.female[which(mort$year >= 2017)])` females in `r mort$year[which(mort$year >= 2017 & total.female == max(total.female[which(mort$year >= 2017)]))]`) was slightly higher. Thus, observed total *known* female mortalities in the central GA are most consistent with the two lowest harvest rate scenarios from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), *status quo* or $h=5$ expected additional females harvested per year.  
+The average total *known* female mortality since the Hooker et al. (2020) study (`r mean(total.female[which(mort$year %in% c(2017:2024))])`) was below the average total mortality from the Hooker et al. (2020) study period (`r mean(total.female[which(mort$year %in% c(2012:2016))])`), while the maximum single-year mortality since 2016 (`r max(total.female[which(mort$year >= 2017)])` females in `r mort$year[which(mort$year >= 2017 & total.female == max(total.female[which(mort$year >= 2017)]))]`) was slightly higher. Thus, observed total *known* female mortality in central GA is most consistent with the two lowest harvest rate scenarios from [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887), *status quo* or $h=5$ expected additional females harvested per year.  
 
 Under both of these scenarios, 50-year extinction risks in the PVA remained below 1%, and population size was relatively stable ([Hooker et al. 2020](https://doi.org/10.1002/jwmg.21887)). Quoting from their Discussion section:
 
@@ -797,7 +800,7 @@ save(forc.h20, file="forc-h20.gzip")
 
 
 ## Compare forecasted abundance
-Now we'll look at the distribution of projected population sizes under each of the management alternatives (*status quo*, +5, +10, +15, or +20 additional females harvested) and ask where our estimates of female abundance in 2023 (138) and 2024 (166) fall in those distributions.  
+Now we'll look at the distribution of projected population sizes under each of the management alternatives (*status quo*, +5, +10, +15, or +20 additional females harvested) and ask where our median parameter estimates for female abundance in 2023 and 2024 fall in those distributions.  
 ```{r compareDist}
 load("forc-h0.gzip")
 load("forc-h5.gzip")
@@ -840,21 +843,19 @@ fyrs <- 2017:(2017+50)
 ```
 
 ### Visual comparisons
-**UPDATE CODE WITH BEST-FITTING MODEL**
-
-Now plot the full time series with our abundance estimates included...  
+Now plot the full time series with our abundance estimates included. We focus on the v1 model, with a single recruitment rate parameter shared by males and females, as the estimates of $\gamma$ are more reliastic under this model.  
 ```{r plotCasts}
 library(scales)
 
 #Load point estimates
-load("../scr/samples-bothSexes-v1.gzip")
+load("../scr/samples-bothSexes_v1.gzip")
 out <- coda::as.mcmc.list(samples)
 Nf23 <- unlist(out[,"Nf[1]"])
 Nf24 <- unlist(out[,"Nf[2]"])
 
 #First for status quo
 plot(fyrs, apply(EN21.h0, 1, median), type = "l", 
-     ylim = c(100,300), lwd = 2, col = "black",
+     ylim = c(50,350), lwd = 2, col = "black",
      xlab = "Year", ylab = "Female Abundance", main = "Status Quo")
 HPD50.h0 <- apply(EN21.h0, 1, quantile, prob = c(0.25, 0.75))
 HPD95.h0 <- apply(EN21.h0, 1, quantile, prob = c(0.025, 0.975))
@@ -876,16 +877,16 @@ arrows(x0 = 2024, x1 = 2024,
 
 #Then for 5 additional females per year
 plot(fyrs, apply(EN21.h5, 1, median), type = "l",
-     ylim = c(100,300), lwd = 2, col = "darkblue",
+     ylim = c(50,350), lwd = 2, col = "black",
      xlab = "Year", ylab = "Female Abundance", main = "+5 Females")
 HPD50.h5 <- apply(EN21.h5, 1, quantile, prob = c(0.25, 0.75))
 HPD95.h5 <- apply(EN21.h5, 1, quantile, prob = c(0.025, 0.975))
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD50.h5[1,], HPD50.h5[2,][ncol(HPD50.h5):1]),
-    col = alpha("darkblue", 0.25), border = NA)
+    col = alpha("black", 0.25), border = NA)
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD95.h5[1,], HPD95.h5[2,][ncol(HPD95.h5):1]),
-    col = alpha("darkblue", 0.1), border = NA)
+    col = alpha("black", 0.1), border = NA)
 #Add points for estimates (and HPDI)
 points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
 arrows(x0 = 2023, x1 = 2023, 
@@ -898,16 +899,16 @@ arrows(x0 = 2024, x1 = 2024,
 
 #Then for 10 additional females per year
 plot(fyrs, apply(EN21.h10, 1, median), type = "l",
-     ylim = c(100,300), lwd = 2, col = "darkred",
+     ylim = c(50,350), lwd = 2, col = "black",
      xlab = "Year", ylab = "Female Abundance", main = "+10 Females")
 HPD50.h10 <- apply(EN21.h10, 1, quantile, prob = c(0.25, 0.75))
 HPD95.h10 <- apply(EN21.h10, 1, quantile, prob = c(0.025, 0.975))
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD50.h10[1,], HPD50.h10[2,][ncol(HPD50.h10):1]),
-    col = alpha("darkred", 0.25), border = NA)
+    col = alpha("black", 0.25), border = NA)
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD95.h10[1,], HPD95.h10[2,][ncol(HPD95.h10):1]),
-    col = alpha("darkred", 0.1), border = NA)
+    col = alpha("black", 0.1), border = NA)
 #Add points for estimates (and HPDI)
 points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
 arrows(x0 = 2023, x1 = 2023, 
@@ -920,16 +921,16 @@ arrows(x0 = 2024, x1 = 2024,
 
 #Then for 15 additional females per year
 plot(fyrs, apply(EN21.h15, 1, median), type = "l",
-     ylim = c(100,300), lwd = 2, col = "darkred",
+     ylim = c(50,350), lwd = 2, col = "black",
      xlab = "Year", ylab = "Female Abundance", main = "+15 Females")
 HPD50.h15 <- apply(EN21.h15, 1, quantile, prob = c(0.25, 0.75))
 HPD95.h15 <- apply(EN21.h15, 1, quantile, prob = c(0.025, 0.975))
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD50.h15[1,], HPD50.h15[2,][ncol(HPD50.h15):1]),
-    col = alpha("darkred", 0.25), border = NA)
+    col = alpha("black", 0.25), border = NA)
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD95.h15[1,], HPD95.h15[2,][ncol(HPD95.h15):1]),
-    col = alpha("darkred", 0.1), border = NA)
+    col = alpha("black", 0.1), border = NA)
 #Add points for estimates (and HPDI)
 points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
 arrows(x0 = 2023, x1 = 2023, 
@@ -942,16 +943,16 @@ arrows(x0 = 2024, x1 = 2024,
 
 #Then for 20 additional females per year
 plot(fyrs, apply(EN21.h20, 1, median), type = "l",
-     ylim = c(100,300), lwd = 2, col = "darkred",
+     ylim = c(50,350), lwd = 2, col = "black",
      xlab = "Year", ylab = "Female Abundance", main = "+20 Females")
 HPD50.h20 <- apply(EN21.h20, 1, quantile, prob = c(0.25, 0.75))
 HPD95.h20 <- apply(EN21.h20, 1, quantile, prob = c(0.025, 0.975))
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD50.h20[1,], HPD50.h20[2,][ncol(HPD50.h20):1]),
-    col = alpha("darkred", 0.25), border = NA)
+    col = alpha("black", 0.25), border = NA)
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD95.h20[1,], HPD95.h20[2,][ncol(HPD95.h20):1]),
-    col = alpha("darkred", 0.1), border = NA)
+    col = alpha("black", 0.1), border = NA)
 #Add points for estimates (and HPDI)
 points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
 arrows(x0 = 2023, x1 = 2023, 
@@ -976,7 +977,7 @@ EN21.h20 <- EN21.h20[1:max.yr,]
 
 #First for status quo
 plot(fyrs, apply(EN21.h0, 1, median), type = "l", 
-     ylim = c(100,300), lwd = 2, col = "black",
+     ylim = c(50,350), lwd = 2, col = "black",
      xlab = "Year", ylab = "Female Abundance", main = "Status Quo")
 HPD50.h0 <- apply(EN21.h0, 1, quantile, prob = c(0.25, 0.75))
 HPD95.h0 <- apply(EN21.h0, 1, quantile, prob = c(0.025, 0.975))
@@ -998,16 +999,16 @@ arrows(x0 = 2024, x1 = 2024,
 
 #Then for 5 additional females per year
 plot(fyrs, apply(EN21.h5, 1, median), type = "l",
-     ylim = c(100,300), lwd = 2, col = "darkblue",
+     ylim = c(50,350), lwd = 2, col = "black",
      xlab = "Year", ylab = "Female Abundance", main = "+5 Females")
 HPD50.h5 <- apply(EN21.h5, 1, quantile, prob = c(0.25, 0.75))
 HPD95.h5 <- apply(EN21.h5, 1, quantile, prob = c(0.025, 0.975))
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD50.h5[1,], HPD50.h5[2,][ncol(HPD50.h5):1]),
-    col = alpha("darkblue", 0.25), border = NA)
+    col = alpha("black", 0.25), border = NA)
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD95.h5[1,], HPD95.h5[2,][ncol(HPD95.h5):1]),
-    col = alpha("darkblue", 0.1), border = NA)
+    col = alpha("black", 0.1), border = NA)
 #Add points for estimates (and HPDI)
 points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
 arrows(x0 = 2023, x1 = 2023, 
@@ -1020,16 +1021,16 @@ arrows(x0 = 2024, x1 = 2024,
 
 #Then for 10 additional females per year
 plot(fyrs, apply(EN21.h10, 1, median), type = "l",
-     ylim = c(100,300), lwd = 2, col = "darkred",
+     ylim = c(50,350), lwd = 2, col = "black",
      xlab = "Year", ylab = "Female Abundance", main = "+10 Females")
 HPD50.h10 <- apply(EN21.h10, 1, quantile, prob = c(0.25, 0.75))
 HPD95.h10 <- apply(EN21.h10, 1, quantile, prob = c(0.025, 0.975))
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD50.h10[1,], HPD50.h10[2,][ncol(HPD50.h10):1]),
-    col = alpha("darkred", 0.25), border = NA)
+    col = alpha("black", 0.25), border = NA)
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD95.h10[1,], HPD95.h10[2,][ncol(HPD95.h10):1]),
-    col = alpha("darkred", 0.1), border = NA)
+    col = alpha("black", 0.1), border = NA)
 #Add points for estimates (and HPDI)
 points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
 arrows(x0 = 2023, x1 = 2023, 
@@ -1042,16 +1043,16 @@ arrows(x0 = 2024, x1 = 2024,
 
 #Then for 15 additional females per year
 plot(fyrs, apply(EN21.h15, 1, median), type = "l",
-     ylim = c(100,300), lwd = 2, col = "darkred",
+     ylim = c(50,350), lwd = 2, col = "black",
      xlab = "Year", ylab = "Female Abundance", main = "+15 Females")
 HPD50.h15 <- apply(EN21.h15, 1, quantile, prob = c(0.25, 0.75))
 HPD95.h15 <- apply(EN21.h15, 1, quantile, prob = c(0.025, 0.975))
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD50.h15[1,], HPD50.h15[2,][ncol(HPD50.h15):1]),
-    col = alpha("darkred", 0.25), border = NA)
+    col = alpha("black", 0.25), border = NA)
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD95.h15[1,], HPD95.h15[2,][ncol(HPD95.h15):1]),
-    col = alpha("darkred", 0.1), border = NA)
+    col = alpha("black", 0.1), border = NA)
 #Add points for estimates (and HPDI)
 points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
 arrows(x0 = 2023, x1 = 2023, 
@@ -1064,16 +1065,16 @@ arrows(x0 = 2024, x1 = 2024,
 
 #Then for 20 additional females per year
 plot(fyrs, apply(EN21.h20, 1, median), type = "l",
-     ylim = c(100,300), lwd = 2, col = "darkred",
+     ylim = c(50,350), lwd = 2, col = "black",
      xlab = "Year", ylab = "Female Abundance", main = "+20 Females")
 HPD50.h20 <- apply(EN21.h20, 1, quantile, prob = c(0.25, 0.75))
 HPD95.h20 <- apply(EN21.h20, 1, quantile, prob = c(0.025, 0.975))
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD50.h20[1,], HPD50.h20[2,][ncol(HPD50.h20):1]),
-    col = alpha("darkred", 0.25), border = NA)
+    col = alpha("black", 0.25), border = NA)
 polygon(x=c(fyrs, fyrs[length(fyrs):1]),
     y=c(HPD95.h20[1,], HPD95.h20[2,][ncol(HPD95.h20):1]),
-    col = alpha("darkred", 0.1), border = NA)
+    col = alpha("black", 0.1), border = NA)
 #Add points for estimates (and HPDI)
 points(x = 2023, y = median(Nf23), pch = 19, cex = 0.75, col = "red")
 arrows(x0 = 2023, x1 = 2023, 
@@ -1086,7 +1087,7 @@ arrows(x0 = 2024, x1 = 2024,
 ```
 
 ### Quantify location in distribution
-Finally, where do our point estimates fall in the distribution of simulations? In other words, what percentile is associated with the means of our posterior distributions for abundance?  
+Where do our point estimates fall in the distribution of simulations? In other words, what percentile is associated with the medians of our posterior distributions for abundance?  
 ```{r percCalcs}
 #Create ecdf for each year and scenario
 #Status quo
@@ -1120,19 +1121,15 @@ ecdf.h20.2024 <- ecdf(EN21.h20[which(fyrs == 2024),])
 ecdf.h20.2024(median(Nf24))
 ```
 
-**UPDATE THIS WITH RESULTS FOR ALL SCENARIOS - ADD 15 & 20**  
-The estimate for 2023 falls in the lower tail of the distributions of forecasted abundances under *status quo* management and with 5 additional females harvested per year, but is in the central 50th percentile interval with 10 additional females harvested per year. Meanwhile, the 2024 estimate falls in the central 50th percentile interval under all three scenarios.  
 
 ### Quantifying "fit" of the scenarios
-**UPDATE CODE WITH BEST-FITTING MODEL**
-Can we distinguish between the "fit" of the five scenarios simulated in Hooker et al. (2020)? There is substantial overlap in the predictions from the model, partially due to the assumption of Poisson-distributed annual harvest (*i.e.*, we are not removing exactly 5, 10, 15, or 20 bears from the population each year). Notably, annual known mortality numbers since the Hooker et al. (2020) study were most similar to the *status quo* or 5 additional females removed scenarios (see above). However, we are still interested in assessing whether these scenarios generate distinguishable predictions for abundance after < 10 years of management.  
+Can we distinguish between the "fit" of the scenarios simulated in Hooker et al. (2020) to our abundance estimates from 2023 and 2024? There is substantial overlap in the predictions from the model with more limited harvest rates, partially due to the assumption of Poisson-distributed annual harvest (*i.e.*, with $h=5$, we are not removing exactly 5 bears from the population each year). Notably, annual known mortality numbers since the Hooker et al. (2020) study were most similar to the *status quo* or 5 additional females removed scenarios (see above). However, we are still interested in assessing whether the different scenarios generate distinguishable predictions for abundance.  
 
 To assess the fit of our estimates (*i.e.*, posterior distributions of female abundance in 2023 and 2024) to the management scenarios from Hooker et al. (2020), we will calculate Kullback-Leibler divergence ($D_{kl}$) between the distributions of simulated abundance under each scenario and the posterior distribution of estimated abundance for each of the two study years. We'll use the `kld_est_nn()` function from the `kldest` R package ([Hartung 2024](https://CRAN.R-project.org/package=kldest)) to estimate KL divergence between our forecasts and posteriors with a nearest-neighbor approach.  
 ```{r KLD}
 #First collect the distributions of abundance from the forecasts
 # combine these into one data frame from each of the scenarios
-# these will be the distributions that we compare in terms of 
-# their ability to approximate the posterior distributions
+# these will be the distributions that we compare to posteriors
 h0df <- data.frame(n23 = EN21.h0[which(fyrs == 2023),],
                    n24 = EN21.h0[which(fyrs == 2024),])
 h5df <- data.frame(n23 = EN21.h5[which(fyrs == 2023),],
@@ -1146,7 +1143,7 @@ h20df <- data.frame(n23 = EN21.h20[which(fyrs == 2023),],
 
 #Now combine posteriors in the same fashion
 # this is the "true" distribution we're seeking to approximate
-load("../scr/samples-bothSexes-v1.gzip")
+load("../scr/samples-bothSexes_v1.gzip")
 out <- coda::as.mcmc.list(samples)
 
 est.df <- data.frame(n23 = unlist(out[,"Nf[1]"]),
@@ -1163,13 +1160,6 @@ kld_est_nn(X=est.df, Y=h15df, k=50) #+15 females
 kld_est_nn(X=est.df, Y=h20df, k=50) #+20 females
 
 ```
-
-From this comparison, the Kullback-Leibler divergence $D_{kl}$ is smallest for the +#### females harvested management scenario.  
-
-
-## Summary
-**UPDATE THIS**
-Point estimates of abundance from our SCR study are broadly consistent with predictions from PVA simulations with limited harvest scenarios from Hooker et al. (2020). Point estimates of female abundance fell within the distribution of simulated abundances for 2023 and 2024 for **all scenarios (true??)**. The distribution of simulated abundances from the scenario with 5 additional females harvested per year matches the posterior distributions of female abundance in 2023 and 2024 most closely, as measured by $D_{kl}$.  
 
 
 ---
