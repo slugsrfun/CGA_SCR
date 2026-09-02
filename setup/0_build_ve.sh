@@ -20,11 +20,11 @@ conda create -p /home/jdrobins/veGAbears
 source activate /home/jdrobins/veGAbears
 
 #Install software...
-conda install --file veCGA_packageList.txt
+conda install --file veGAbears_pkglist.txt
 # Type "y" to proceed 
 
 #Save the explicit list of packages used to create this VE
-conda list --explicit > veGAbears_pkglist.txt
+#conda list --explicit > veGAbears_pkglist.txt
 
 #Clone scrbook R package from Andy Royle's GitHub page
 cd /home/jdrobins
