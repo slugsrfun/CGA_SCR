@@ -18,3 +18,4 @@ setup/data/jax_bbear/genes.gtf
 setup/data/jax_bbear/sequences.fa
 *.Rws
 *.gzip
+*.history
