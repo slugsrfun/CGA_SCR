@@ -11,7 +11,11 @@ linkcolor: blue
 # Background
 [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887) used noninvasive sampling and spatial capture-recapture models to estimate the abundance of female black bears in central Georgia. Their analysis yielded point estimates of $N_t$ between 106 and 166 using samples collected between 2012 and 2016. Using the same model, Hooker et al. (2020) also conducted population viability analyses (PVA) for the central GA black bear population. They projected abundance 50 years into the future using survival and density-dependent recruitment rates under management scenarios where a Poisson-distributed number of additional females (above current levels) were removed from the population by harvest. They evaluated *status quo* simulations (no additional harvest) and four alternatives where an average of $h=5$, 10, 15, or 20 females (above *status quo* levels) were removed from the population by harvest. They found that 50-year extinction risk remained <1% in both the *status quo* and $h=5$ simulations (see Figure 6 of [Hooker et al. 2020](https://doi.org/10.1002/jwmg.21887)).  
 
-In this markdown, we will revisit predictions from these simulations and use data for *known* female mortalities (which likely underestimates total mortality) to assess i) which scenario considered in the PVA from Hooker et al. (2020) is most similar to the recent past in central GA? and ii) which scenario do estimates of abundance from the present study (see `13_fitHooker_bothSexes`) align with most closely?  
+In this markdown, we will revisit predictions from these simulations and use data for *known* female mortalities (which likely underestimates total mortality) to address two questions:
+
+i. Which scenario considered in the PVA from Hooker et al. (2020) is most similar to the recent past in central GA?
+ii. Which scenario do estimates of abundance from the present study (see `13_fitHooker_bothSexes`) most closely align with?  
+
 
 This markdown will cover the following analyses:
 
@@ -71,32 +75,6 @@ color.pal <- c(alpha("black", 0.6),
                alpha("orange", 0.6),
                alpha("darkred",0.6))
 
-#As a scatter plot
-plot(total.all ~ all.mort$year, 
-     type = "b", lwd = 1.5, pch=19, col = color.pal[1], 
-     ylim = c(-2.5,(max(total.all)+5)),
-     xlab = "Year", ylab = "Mortalities", main = "All Bears")
-lines(all.mort$harvest ~ all.mort$year, 
-      pch=19, type = "b", col = color.pal[2])
-lines(all.mort$illegal ~ all.mort$year, 
-      pch=19, type = "b", col = color.pal[3])
-lines(all.mort$road ~ all.mort$year, 
-      pch=19, type = "b", col = color.pal[4])
-legend("topleft", cex = 0.75, bty="n", 
-       lty=1, pch=19, col=color.pal,
-       legend=c("Total","Legal Harvest","Illegal Take","Roadkill"))
-
-#As an area chart
-library(areaplot)
-areaplot(x=mort$year,
-         y=all.mort[,-1],
-         col=color.pal[2:4],
-         xlab = "Year", ylab = "Mortalities", main = "All Bears")
-legend("topleft", cex = 0.75, bty="n", 
-       fill=color.pal[2:4],
-       legend=c("Legal Harvest","Illegal Take","Roadkill"))
-
-#As a stacked barplot
 barplot(height = rbind(all.mort$road, all.mort$illegal, all.mort$harvest),
         beside = FALSE, names.arg = all.mort$year, col = color.pal[4:2],
         xlab = "Year", ylab = "Mortalities",  main = "Total", 
@@ -112,31 +90,6 @@ Now for females only...
 mort[,which(colnames(mort) %in% c("year","harvestF","illegalF","roadF"))]
 mean(total.female)
 
-#Scatter plot
-plot(total.female ~ mort$year, 
-     type = "b", lwd = 1.5, pch=19, col = color.pal[1], 
-     ylim = c(-2.5,(max(total.female)+5)),
-     xlab = "Year", ylab = "Mortalities", main = "Females")
-lines(mort$harvestF ~ mort$year, 
-      pch=19, type = "b", col = color.pal[2])
-lines(mort$illegalF ~ mort$year, 
-      pch=19, type = "b", col = color.pal[3])
-lines(mort$roadF ~ mort$year, 
-      pch=19, type = "b", col = color.pal[4])
-legend("topleft", cex = 0.75, bty="n", 
-       lty=1, pch=19, col=color.pal,
-       legend=c("Total","Legal Harvest","Illegal Take","Roadkill"))
-
-#Area chart
-areaplot(x=mort$year,
-         y=cbind(mort$harvestF, mort$illegalF, mort$roadF),
-         col=color.pal[2:4],
-         xlab = "Year", ylab = "Mortalities", main = "Females")
-legend("topleft", cex = 0.75, bty="n", 
-       fill=color.pal[2:4],
-       legend=c("Legal Harvest","Illegal Take","Roadkill"))
-
-#Stacked barplot
 barplot(height = rbind(mort$roadF, mort$illegalF, mort$harvestF), 
         beside = FALSE, names.arg = mort$year, col = color.pal[4:2], 
         xlab = "Year", ylab = "Mortalities", main = "Females",  
@@ -153,31 +106,6 @@ Notice from this plot that vehicular collisions are less frequent in females.
 mort[,which(colnames(mort) %in% c("year","harvestM","illegalM","roadM"))]
 mean(total.male)
 
-#Scatter plot
-plot(total.male ~ mort$year, 
-     type = "b", lwd = 1.5, pch=19, col = color.pal[1], 
-     ylim = c(-2.5,(max(total.male)+5)),
-     xlab = "Year", ylab = "Mortalities", main = "Males")
-lines(mort$harvestM ~ mort$year, 
-      pch=19, type = "b", col = color.pal[2])
-lines(mort$illegalM ~ mort$year, 
-      pch=19, type = "b", col = color.pal[3])
-lines(mort$roadM ~ mort$year, 
-      pch=19, type = "b", col = color.pal[4])
-legend("topleft", cex = 0.75, bty="n", 
-       lty=1, pch=19, col=color.pal,
-       legend=c("Total","Legal Harvest","Illegal Take","Roadkill"))
-
-#Area chart
-areaplot(x=mort$year,
-         y=cbind(mort$harvestM, mort$illegalM, mort$roadM),
-         col=color.pal[2:4],
-         xlab = "Year", ylab = "Mortalities", main = "Males")
-legend("topleft", cex = 0.75, bty="n", 
-       fill=color.pal[2:4],
-       legend=c("Legal Harvest","Illegal Take","Roadkill"))
-
-#Stacked barplot
 barplot(height = rbind(mort$roadM, mort$illegalM, mort$harvestM), 
         beside = FALSE, names.arg = mort$year, col = color.pal[4:2], 
         xlab = "Year", ylab = "Mortalities", main = "Males", 
@@ -216,7 +144,7 @@ boxplot(mort$roadF, mort$roadM,
         ylab = "Roadkill")
 ```
 
-From the quick comparisons above, it appears that total mortality is indeed higher in males. However, legal harvest numbers are higher in females. Perhaps this is due to male bears leaving the study area during the winter. The difference in harvest is more than offset by higher male mortality rates from vehicular collisions.  
+From the quick comparisons above, it appears that total mortality is indeed higher in males. However, legal harvest numbers are higher in females. The difference in harvest is more than offset by higher male mortality rates from vehicular collisions.  
 
 
 ## Average mortality numbers 
@@ -362,11 +290,19 @@ The average total *known* female mortality since the Hooker et al. (2020) study 
 
 Under both of these scenarios, 50-year extinction risks in the PVA remained below 1%, and population size was relatively stable ([Hooker et al. 2020](https://doi.org/10.1002/jwmg.21887)). Quoting from their Discussion section:
 
-*From an abundance of 165 (95% CI = 134–206) in 2016, the 50‐year population forecasts (i.e., estimated abundance in the year 2067) for each of the 5 harvest scenarios in order of lowest to highest harvest were 169 (95% CI = 134–268), 159 (95% CI = 124–243), 147 (95% CI = 103–223), 132 (95% CI = 0–197), and 105 (95% CI = 0–174). Extinction probabilities for the status quo scenario (i.e., the lowest level of harvest of any of the scenarios) was negligible at <0.001% with no abundance projections falling to zero during the 50‐year timeline. Similarly, the scenario in which the status quo harvest was increased by 5 females had few projections in which abundance dropped to zero, resulting in an extinction risk of <1%.* --[Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887)  
+*From an abundance of 165 (95% CI = 134–206) in 2016, the 50‐year population forecasts (i.e., estimated abundance in the year 2067) for each of the 5 harvest scenarios in order of lowest to highest harvest were 169 (95% CI = 134–268), 159 (95% CI = 124–243), 147 (95% CI = 103–223), 132 (95% CI = 0–197), and 105 (95% CI = 0–174). Extinction probabilities for the status quo scenario (i.e., the lowest level of harvest of any of the scenarios) was negligible at <0.001% with no abundance projections falling to zero during the 50‐year timeline. Similarly, the scenario in which the status quo harvest was increased by 5 females had few projections in which abundance dropped to zero, resulting in an extinction risk of <1%.* 
+
+-- [Hooker et al. (2020)](https://doi.org/10.1002/jwmg.21887)  
 
 
 ## Re-fit the Hooker model
-To quantify the degree to which our estimates of female abundance align with predictions from the population viability analyses of Hooker et al. (2020), we will first re-fit the model to capture data for female bears. The files needed to do this are available on the Hooker et al. (2020) [GitHub repository](https://github.com/rbchan/ga-bear-pva/tree/master): [`dT-s0-rPDD2-phi0-pYB-sig0.jag`](https://github.com/rbchan/ga-bear-pva/blob/master/R/dT-s0-rPDD2-phi0-pYB-sig0.jag), [`fit.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/fit.R), [`ga_bear_data_females.gzip`](https://github.com/rbchan/ga-bear-pva/blob/master/data/ga_bear_data_females.gzip), and [`state-space360.tif`](https://github.com/rbchan/ga-bear-pva/blob/master/data/state-space360.tif).  
+To quantify the degree to which our estimates of female abundance align with predictions from the population viability analyses of Hooker et al. (2020), we will first re-fit the model to capture data for female bears. The files needed to do this are available on the Hooker et al. (2020) [GitHub repository](https://github.com/rbchan/ga-bear-pva/tree/master):
+
+i. [`dT-s0-rPDD2-phi0-pYB-sig0.jag`](https://github.com/rbchan/ga-bear-pva/blob/master/R/dT-s0-rPDD2-phi0-pYB-sig0.jag)
+ii. [`fit.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/fit.R), [`ga_bear_data_females.gzip`](https://github.com/rbchan/ga-bear-pva/blob/master/data/ga_bear_data_females.gzip)
+iii. [`state-space360.tif`](https://github.com/rbchan/ga-bear-pva/blob/master/data/state-space360.tif).
+
+Note that we keep the same random number seed from the Hooker et al. (2020) code below.  
 ```{r redoFit}
 #Code below is copied from fit.R
 # paths to the JAGS model, capture history data, and state space file
@@ -710,7 +646,7 @@ summary(as.mcmc.list(jc4.out)[,c("N[1]","N[2]","N[3]","N[4]","N[5]","phi")])
 
 ## Forecast abundance
 We then use the [`forecast_fn.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/forecast_fn.R) and [`forecast.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/forecast.R) scripts from the [GitHub repository](https://github.com/rbchan/ga-bear-pva) associated with that project to recreate the forecasted population sizes.  
-```{r redoForc}
+```{r redoForc message=FALSE, warning=FALSE}
 #Code below is copied from forecast.R
 # the path to the forecast_fn.R script is modified slightly
 
@@ -1086,7 +1022,7 @@ arrows(x0 = 2024, x1 = 2024,
 ```
 
 ### Quantify location in distribution
-Where do our point estimates fall in the distribution of simulations? In other words, what percentile is associated with the medians of our posterior distributions for abundance?  
+Where do our point estimates fall in the distribution of median abundances from PVA simulations? In other words, what percentile is associated with the medians of our posterior distributions for abundance?  
 ```{r percCalcs}
 #Create ecdf for each year and scenario
 #Status quo
@@ -1120,46 +1056,109 @@ ecdf.h20.2024 <- ecdf(EN21.h20[which(fyrs == 2024),])
 ecdf.h20.2024(median(Nf24))
 ```
 
+From this comparison, we can see that the point estimate from 2023 is inconsistent with the more limited harvest rates of $h = 0$ (*status quo*) and $h = 5$. However, it falls within the central 95th percentile interval (between the 2.5th and 97.5th percentile) for all other scenarios. Meanwhile, the point esimate of female abundance from 2024 falls within this interval for all simulated scenarios. This suggests that our estimates of abundance are broadly consistent with predictions from PVA simulations, particularly in the second year of the study.  
 
 ### Quantifying "fit" of the scenarios
-Can we distinguish between the "fit" of the scenarios simulated in Hooker et al. (2020) to our abundance estimates from 2023 and 2024? There is substantial overlap in the predictions from the model with more limited harvest rates, partially due to the assumption of Poisson-distributed annual harvest (*i.e.*, with $h=5$, we are not removing exactly 5 bears from the population each year). Notably, annual known mortality numbers since the Hooker et al. (2020) study were most similar to the *status quo* or 5 additional females removed scenarios (see above). However, we are still interested in assessing whether the different scenarios generate distinguishable predictions for abundance.  
+Now to assess whether we can distinguish between the "fit" of the different scenarios simulated in Hooker et al. (2020) to our abundance estimates. Notably, there is substantial overlap in the predictions from the model with more limited harvest rates, partially due to the assumption of Poisson-distributed annual harvest (*i.e.*, with $h=5$, we are not removing exactly 5 bears from the population each year). Annual known mortality numbers since the Hooker et al. (2020) study were most similar to the *status quo* or 5 additional females removed scenarios (see above). However, we are still interested in assessing whether the different scenarios generate distinguishable predictions for abundance.  
 
-To assess the fit of our estimates (*i.e.*, posterior distributions of female abundance in 2023 and 2024) to the management scenarios from Hooker et al. (2020), we will calculate Kullback-Leibler divergence ($D_{kl}$) between the distributions of simulated abundance under each scenario and the posterior distribution of estimated abundance for each of the two study years. We'll use the `kld_est_nn()` function from the `kldest` R package ([Hartung 2024](https://CRAN.R-project.org/package=kldest)) to estimate KL divergence between our forecasts and posteriors with a nearest-neighbor approach.  
+To assess the fit of our estimates (*i.e.*, posterior distributions of female abundance in 2023 and 2024) to the management scenarios from Hooker et al. (2020), we will calculate Kullback-Leibler divergence ($D_{kl}$) between the distributions of simulated abundance under each scenario and the posterior distribution of estimated abundance for each of the two study years.  
+
+$$D_{kl} = \sum_i P_i \log(\frac{P_i}{Q_i})$$
+
+where the sum is calculated over the range of abundance values in the posterior distribution and forecasted abundances, $P_i$ is the probability density of value $i$ in the posterior distribution, and $Q_i$ is the probability density of value $i$ in the distribution of forecasted abundances. As these distributions do not overlap perfectly for all scenarios, we also add $\epsilon = 1\times10^{-16}$ to all counts when calculating $P_i$ and $Q_i$.  
+
+Here's the function we'll use to calculate $D_{kl}$.  
+```{r KLDfxn}
+#a function to calculate KL divergence with an epsilon added to avoid P=0 | Q=0
+KLD_eps <- function(true=NULL, approx=NULL, eps=1e-16) {
+  
+  get_probs <- function(x, Xmin, Xmax, eps=1e-16) {
+    x_factor <- factor(x, levels=Xmin:Xmax)
+    x_table <- table(x_factor)+eps
+    X_probs <- x_table/sum(x_table)
+    return(X_probs)
+  }
+  
+  P <- get_probs(true, min(true, approx), max(true, approx))
+  Q <- get_probs(approx, min(true, approx), max(true, approx))
+  
+  KLD <- sum(P*(log(P)-log(Q)))
+  
+  return(KLD)
+}
+```
+
+Now we use this function to calculate $D_{kl}$ for each of the two years (2023 and 2024) under each of the five simulated scenarios.  
 ```{r KLD}
-#First collect the distributions of abundance from the forecasts
-# combine these into one data frame from each of the scenarios
-# these will be the distributions that we compare to posteriors
-h0df <- data.frame(n23 = EN21.h0[which(fyrs == 2023),],
-                   n24 = EN21.h0[which(fyrs == 2024),])
-h5df <- data.frame(n23 = EN21.h5[which(fyrs == 2023),],
-                   n24 = EN21.h5[which(fyrs == 2024),])
-h10df <- data.frame(n23 = EN21.h10[which(fyrs == 2023),],
-                   n24 = EN21.h10[which(fyrs == 2024),])
-h15df <- data.frame(n23 = EN21.h15[which(fyrs == 2023),],
-                   n24 = EN21.h15[which(fyrs == 2024),])
-h20df <- data.frame(n23 = EN21.h20[which(fyrs == 2023),],
-                   n24 = EN21.h20[which(fyrs == 2024),])
-
-#Now combine posteriors in the same fashion
-# this is the "true" distribution we're seeking to approximate
+#Load our posterior distribution of abundances
 load("../scr/samples-bothSexes.gzip")
 out <- coda::as.mcmc.list(samples)
+true23 <- unlist(out[,"Nf[1]"])
+true24 <- unlist(out[,"Nf[2]"])
 
-est.df <- data.frame(n23 = unlist(out[,"Nf[1]"]),
-                     n24 = unlist(out[,"Nf[2]"]))
+#####
+#h=0 (status quo)
+ap23 <- as.vector(forc.h0$Nbar[which(fyrs == 2023),,])
+ap24 <- as.vector(forc.h0$Nbar[which(fyrs == 2024),,])
+
+(KLD.h0.23 <- KLD_eps(true=tr23, approx=ap23))
+(KLD.h0.24 <- KLD_eps(true=tr24, approx=ap24))
+(KLD.h0 <- KLD.h0.23 + KLD.h0.24)
 
 
-#Now calculate divergence for each scenario, using 100 nearest neighbors...
-library(kldest)
+#####
+#h=5
+ap23 <- as.vector(forc.h5$Nbar[which(fyrs == 2023),,])
+ap24 <- as.vector(forc.h5$Nbar[which(fyrs == 2024),,])
 
-kld_est_nn(X=est.df, Y=h0df, k=100) #status quo
-kld_est_nn(X=est.df, Y=h5df, k=100) #+5 females
-kld_est_nn(X=est.df, Y=h10df, k=100) #+10 females
-kld_est_nn(X=est.df, Y=h15df, k=100) #+15 females
-kld_est_nn(X=est.df, Y=h20df, k=100) #+20 females
+(KLD.h5.23 <- KLD_eps(true=tr23, approx=ap23))
+(KLD.h5.24 <- KLD_eps(true=tr24, approx=ap24))
+(KLD.h5 <- KLD.h5.23 + KLD.h5.24)
+
+
+#####
+#h=10
+ap23 <- as.vector(forc.h10$Nbar[which(fyrs == 2023),,])
+ap24 <- as.vector(forc.h10$Nbar[which(fyrs == 2024),,])
+
+(KLD.h10.23 <- KLD_eps(true=tr23, approx=ap23))
+(KLD.h10.24 <- KLD_eps(true=tr24, approx=ap24))
+(KLD.h10 <- KLD.h10.23 + KLD.h10.24)
+
+
+#####
+#h=15
+ap23 <- as.vector(forc.h15$Nbar[which(fyrs == 2023),,])
+ap24 <- as.vector(forc.h15$Nbar[which(fyrs == 2024),,])
+
+(KLD.h15.23 <- KLD_eps(true=tr23, approx=ap23))
+(KLD.h15.24 <- KLD_eps(true=tr24, approx=ap24))
+(KLD.h15 <- KLD.h15.23 + KLD.h15.24)
+
+
+#####
+#h=20
+ap23 <- as.vector(forc.h20$Nbar[which(fyrs == 2023),,])
+ap24 <- as.vector(forc.h20$Nbar[which(fyrs == 2024),,])
+
+(KLD.h20.23 <- KLD_eps(true=tr23, approx=ap23))
+(KLD.h20.24 <- KLD_eps(true=tr24, approx=ap24))
+(KLD.h20 <- KLD.h20.23 + KLD.h20.24)
 
 ```
 
+Note that the scenario that most closely matches the posterior of abundance differs between years. Combining $D_{kl}$ across years suggests that $h=15$ most closely mathces abundance posteriors, while $h=20$ and $h=10$ most closely match abundance estimates from 2023 and 2024, respectively.  
+
+```{r makeKable}
+out <- data.frame(Year1 = 
+                    c(KLD.h0.23, KLD.h5.23, KLD.h10.23, KLD.h15.23, KLD.h20.23),
+                  Year2 =
+                    c(KLD.h0.24, KLD.h5.24, KLD.h10.24, KLD.h15.24, KLD.h20.24),
+                  Combined = 
+                    c(KLD.h0, KLD.h5, KLD.h10, KLD.h15, KLD.h20))
+rownames(out) <- c("Status Quo", "h = 5", "h = 10", "h = 15", "h = 20")
+knitr::kable(out, digits = 3)
+```
 
 
 
