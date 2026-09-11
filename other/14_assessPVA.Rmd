@@ -646,7 +646,10 @@ summary(as.mcmc.list(jc4.out)[,c("N[1]","N[2]","N[3]","N[4]","N[5]","phi")])
 
 ## Forecast abundance
 We then use the [`forecast_fn.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/forecast_fn.R) and [`forecast.R`](https://github.com/rbchan/ga-bear-pva/blob/master/R/forecast.R) scripts from the [GitHub repository](https://github.com/rbchan/ga-bear-pva) associated with that project to recreate the forecasted population sizes.  
-```{r redoForc message=FALSE, warning=FALSE}
+```{r redoForc}
+#Turn of warning messages for the forecasting
+options(warn=-1)
+
 #Code below is copied from forecast.R
 # the path to the forecast_fn.R script is modified slightly
 
@@ -737,6 +740,10 @@ save(forc.h20, file="forc-h20.gzip")
 ## Compare forecasted abundance
 Now we'll look at the distribution of projected population sizes under each of the management alternatives (*status quo*, +5, +10, +15, or +20 additional females harvested) and ask where our median parameter estimates for female abundance in 2023 and 2024 fall in those distributions.  
 ```{r compareDist}
+#Turn warnings back on
+options(warn=0)
+
+#Load output from simulated scenarios
 load("forc-h0.gzip")
 load("forc-h5.gzip")
 load("forc-h10.gzip")
