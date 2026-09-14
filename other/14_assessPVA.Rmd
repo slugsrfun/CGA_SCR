@@ -1100,8 +1100,8 @@ Now we use this function to calculate $D_{kl}$ for each of the two years (2023 a
 #Load our posterior distribution of abundances
 load("../scr/samples-bothSexes.gzip")
 out <- coda::as.mcmc.list(samples)
-true23 <- unlist(out[,"Nf[1]"])
-true24 <- unlist(out[,"Nf[2]"])
+tr23 <- unlist(out[,"Nf[1]"])
+tr24 <- unlist(out[,"Nf[2]"])
 
 #####
 #h=0 (status quo)
